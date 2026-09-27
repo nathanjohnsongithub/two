@@ -1,6 +1,6 @@
 import { k } from "./kaplay.js";
 import { AREAS, CONFIG, ENDING, PROLOGUE } from "./content.js";
-import { SOLID, TILE_NAMES } from "./tileset.js";
+import { FULL, OVERHEAD, SOLID, TILE_NAMES, VARIANTS } from "./tileset.js";
 import { COLORS, ui, say, showMemory, hearts, titleCard } from "./ui.js";
 
 const TILE = 16;
@@ -28,8 +28,10 @@ k.loadSprite("nathan", "/sprites/nathan.png");
 k.loadSprite("grads", "/sprites/grads.png", { sliceX: 3 });
 k.loadSprite("tiles", "/sprites/tiles.png", { sliceX: TILE_NAMES.length });
 const tileFrame = (name) => TILE_NAMES.indexOf(name);
+const hasTile = (name) => TILE_NAMES.includes(name);
 
 // Map characters that place an object tile (see the legend in content.js).
+// A chapter can add its own characters, or change what one means, in `objects`.
 const OBJECTS = {
   w: "window", H: "hedge", c: "counter", k: "sink", s: "stove", O: "stovePot", f: "fridge",
   T: "table", h: "chair", X: "tableCandle", Z: "tableEmptyPlate",
@@ -37,42 +39,99 @@ const OBJECTS = {
   u: "tub", t: "toilet", L: "washer", v: "tv", p: "plant",
   Y: "tree", n: "bench", "~": "water", l: "lantern", S: "storefront",
   W: "stoneWindow", d: "stoneDoor", G: "chairCap", U: "uhaul", Q: "dumpster", F: "fireEscape",
-  r: "rail", K: "skyline", o: "bulbs", E: "elevator",
+  r: "rail", K: "skyline", o: "bulbs", E: "elevator", "^": "roof", e: "lamppost", "*": "flowerBed",
+  j: "nightstand", I: "brickWindow",
 };
-// Objects that cover their whole tile, so no floor is needed underneath.
-const FULL_TILES = new Set([
-  "wall", "window", "brick", "hedge", "water", "storefront", "stove", "stovePot", "counter", "sink",
-  "stone", "stoneWindow", "stoneDoor", "fireEscape", "rail", "railV", "skyline", "decoWall", "elevator",
-  ...["Back", "Body", "Cab"].flatMap((part) => [`uhaul${part}L`, `uhaul${part}R`]),
-]);
+const objectFor = (area, ch) => {
+  if (!ch || ch === " " || area.floors[ch]) return null;
+  return ch === "#" ? area.wall : (area.objects?.[ch] ?? OBJECTS[ch] ?? null);
+};
 
-// Works out what goes in every cell of an area's map: its floor and object tile.
+// Tiles that change along their bottom edge: walls show their front where
+// there's floor in front of them, and roofs end in eaves.
+const BOTTOMS = { wall: "wallFace", window: "windowFace", roof: "roofEave", roofCopper: "roofCopperEave" };
+
+// Trim painted where two surfaces meet: shorelines around water, curbs along
+// the road, the stage's front, the ridge of a roof, and a cornice or gold trim
+// along the tops of buildings.
+const EDGES = [
+  { tile: "shore", on: (s) => s.startsWith("water"), sides: "NSEW", meets: (s) => !s.startsWith("water") },
+  { tile: "curb", on: (s) => s === "sidewalk", sides: "NSEW", meets: (s) => s.startsWith("road") || s === "crosswalk" },
+  { tile: "stageSkirt", on: (s) => s === "stage", sides: "S", meets: (s) => s !== "stage" },
+  { tile: "ridge", on: (s) => s.startsWith("roof"), sides: "N", meets: (s) => !s.startsWith("roof") },
+  { tile: "decoTrim", on: (s) => s === "decoWall", sides: "N", meets: (s) => s !== "decoWall" && s !== "elevator" },
+  { tile: "cornice", on: (s) => /^(brick|brickWindow|fireEscapeFront)/.test(s), sides: "N", meets: (s, cell) => !cell.object },
+];
+const SIDES = [["N", -1, 0], ["S", 1, 0], ["E", 0, 1], ["W", 0, -1]];
+
+// Lights that glow through the night tint: [x, y, radius] from the tile's center.
+const GLOWS = {
+  bulbs: [[-4, -2, 3.5], [4, -2, 3.5]],
+  tableCandle: [[0, -2, 7]],
+  bistroTable: [[0, -5, 5]],
+  heater: [[0, -17, 11]],
+};
+
+// Some tiles come in a few looks (grass with flowers, different trees...).
+// The look is picked from the cell's position, so a map looks the same every time.
+function vary(name, r, c) {
+  const looks = VARIANTS[name];
+  if (!looks) return name;
+  let h = Math.imul(r * 374761393 + c * 668265263, 1274126177) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0;
+  let roll = h % looks.reduce((sum, [, weight]) => sum + weight, 0);
+  for (const [look, weight] of looks) if ((roll -= weight) < 0) return look;
+  return name;
+}
+
+// Works out what goes in every cell of an area's map: its floor and object
+// tile, trim along its edges, and the top half of anything tall.
 function layout(area) {
   const rows = area.map;
   const defaultFloor = Object.values(area.floors)[0];
-  // Objects sit on whichever floor is next to them (so a lantern in Chinatown
-  // gets sidewalk under it, not park grass).
+  // Objects sit on the floor most of the cells beside them have (so a lantern in
+  // Chinatown gets sidewalk under it, and the last chair in a row stays on the
+  // grass). Ties go to left, right, up, down in that order, and corners only
+  // count when nothing beside it is floor.
   const floorAt = (r, c) => {
-    for (const [dr, dc] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, 1], [-1, 1], [1, -1]]) {
-      const ch = rows[r + dr]?.[c + dc];
-      if (ch && area.floors[ch]) return area.floors[ch];
+    for (const around of [[[0, -1], [0, 1], [-1, 0], [1, 0]], [[-1, -1], [1, 1], [-1, 1], [1, -1]]]) {
+      const counts = new Map();
+      for (const [dr, dc] of around) {
+        const floor = area.floors[rows[r + dr]?.[c + dc]];
+        if (floor) counts.set(floor, (counts.get(floor) ?? 0) + 1);
+      }
+      let best = null;
+      for (const [floor, n] of counts) if (!best || n > counts.get(best)) best = floor;
+      if (best) return best;
     }
     return defaultFloor;
   };
+  const counterish = (ch) => ["counter", "sink", "stove", "stovePot", "fridge"].includes(objectFor(area, ch));
   const cells = [];
+  const grid = rows.map(() => []);
   rows.forEach((row, r) => {
     [...row].forEach((ch, c) => {
       if (ch === " ") return;
       if (area.floors[ch]) {
-        cells.push({ r, c, ch, floor: area.floors[ch], object: null });
+        cells.push((grid[r][c] = { r, c, ch, floor: area.floors[ch], object: null }));
         return;
       }
-      let object = ch === "#" ? area.wall : (OBJECTS[ch] ?? null);
-      // Side-by-side beds join into one wide bed.
-      if (ch === "B" || ch === "b") {
-        if (row[c + 1] === ch) object += "L";
-        else if (row[c - 1] === ch) object += "R";
+      let object = objectFor(area, ch);
+      // A row of the same piece joins up: beds, the taxi, the restaurant front
+      // (which gets its door in the middle).
+      let c0 = c;
+      let c1 = c;
+      while (row[c0 - 1] === ch) c0--;
+      while (row[c1 + 1] === ch) c1++;
+      if (c1 > c0 && hasTile(`${object}L`) && hasTile(`${object}R`)) {
+        const door = c === Math.floor((c0 + c1) / 2) && hasTile(`${object}Door`);
+        const piece = c === c0 ? "L" : c === c1 ? "R" : door ? "Door" : "M";
+        if (hasTile(object + piece)) object += piece;
       }
+      // Pieces stacked two high (tall windows, parked cars) share one look from their top half.
+      const first = rows[r - 1]?.[c] !== ch;
+      const look = object && vary(object, first ? r : r - 1, c);
+      if (look && hasTile(`${look}N`) && hasTile(`${look}S`)) object = look + (first ? "N" : "S");
       // The U-Haul is a 2x3 block: back doors on top, cab at the bottom.
       if (ch === "U") {
         const part = rows[r - 1]?.[c] !== "U" ? "Back" : rows[r + 1]?.[c] !== "U" ? "Cab" : "Body";
@@ -85,15 +144,40 @@ function layout(area) {
       }
       // Railings run vertically when there's railing above or below and none beside.
       if (ch === "r" && row[c - 1] !== "r" && row[c + 1] !== "r") object = "railV";
-      const floor = object && FULL_TILES.has(object) ? null : floorAt(r, c);
-      cells.push({ r, c, ch, floor, object });
+      // Counters along a side wall turn to face the room.
+      if (object === "counter" && !counterish(row[c - 1]) && !counterish(row[c + 1])) {
+        if (counterish(rows[r - 1]?.[c]) || counterish(rows[r + 1]?.[c])) object = "counterV";
+      }
+      const below = rows[r + 1]?.[c];
+      if (BOTTOMS[object] && below && below !== " " && !BOTTOMS[objectFor(area, below)]) object = BOTTOMS[object];
+      const floor = object && FULL.has(object) ? null : floorAt(r, c);
+      cells.push((grid[r][c] = { r, c, ch, floor, object }));
     });
   });
+
+  const surface = (cell) => (cell.object && FULL.has(cell.object) ? cell.object : cell.floor);
+  for (const cell of cells) {
+    const { r, c } = cell;
+    cell.floorLook = cell.floor && vary(cell.floor, r, c);
+    cell.objectLook = cell.object && vary(cell.object, r, c);
+    // Tall things (lampposts, heaters) reach up into the cell above.
+    if (cell.object && r > 0 && hasTile(`${cell.objectLook}Top`)) cell.top = `${cell.objectLook}Top`;
+    cell.edges = [];
+    for (const edge of EDGES) {
+      if (!edge.on(surface(cell))) continue;
+      for (const [side, dr, dc] of SIDES) {
+        const next = grid[r + dr]?.[c + dc];
+        if (edge.sides.includes(side) && next && edge.meets(surface(next), next)) cell.edges.push(edge.tile + side);
+      }
+    }
+  }
   return cells;
 }
 
-// Each map's floors and furniture are painted into one image up front, so the
-// game draws a single sprite per area instead of hundreds of tiles.
+// Each map is painted into two images up front: the ground (floors, walls,
+// furniture) and whatever hangs above Hannah's head (lanterns, string lights,
+// the tops of lampposts). The game then draws two sprites per area instead of
+// hundreds of tiles.
 const tilesImage = new Promise((resolve, reject) => {
   const img = new Image();
   img.onload = () => resolve(img);
@@ -103,18 +187,28 @@ const tilesImage = new Promise((resolve, reject) => {
 k.load(
   tilesImage.then((img) => {
     AREAS.forEach((area, i) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = area.map[0].length * TILE;
-      canvas.height = area.map.length * TILE;
-      const ctx = canvas.getContext("2d");
-      ctx.imageSmoothingEnabled = false;
-      const draw = (name, r, c) =>
+      const [ground, above] = [0, 1].map(() => {
+        const canvas = document.createElement("canvas");
+        canvas.width = area.map[0].length * TILE;
+        canvas.height = area.map.length * TILE;
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+        return ctx;
+      });
+      const draw = (ctx, name, r, c) =>
         ctx.drawImage(img, tileFrame(name) * TILE, 0, TILE, TILE, c * TILE, r * TILE, TILE, TILE);
       for (const cell of layout(area)) {
-        if (cell.floor) draw(cell.floor, cell.r, cell.c);
-        if (cell.object) draw(cell.object, cell.r, cell.c);
+        const { r, c } = cell;
+        // Trim goes on whichever surface it belongs to: the floor, or an object covering it.
+        const trimFloor = !cell.object || !FULL.has(cell.object);
+        if (cell.floor) draw(ground, cell.floorLook, r, c);
+        if (trimFloor) cell.edges.forEach((edge) => draw(ground, edge, r, c));
+        if (cell.object) draw(OVERHEAD.has(cell.object) ? above : ground, cell.objectLook, r, c);
+        if (!trimFloor) cell.edges.forEach((edge) => draw(ground, edge, r, c));
+        if (cell.top) draw(above, cell.top, r - 1, c);
       }
-      k.loadSprite(`map-${i}`, canvas);
+      k.loadSprite(`map-${i}`, ground.canvas);
+      k.loadSprite(`map-${i}-above`, above.canvas);
     });
   }),
 );
@@ -131,7 +225,7 @@ AREAS.forEach((area) => {
 AREAS.forEach((area, a) => {
   const label = `Chapter ${a + 1}`;
   const width = area.map[0].length;
-  const known = new Set([..."#PNDx 123456789", ...Object.keys(OBJECTS), ...Object.keys(area.floors)]);
+  const known = new Set([..."#PNDx 123456789", ...Object.keys(OBJECTS), ...Object.keys(area.objects ?? {}), ...Object.keys(area.floors)]);
   area.map.forEach((row, r) => {
     if (row.length !== width) console.warn(`${label} map row ${r + 1} is ${row.length} wide, expected ${width}`);
     for (const ch of row) if (!known.has(ch)) console.warn(`${label} map has unknown character "${ch}" in row ${r + 1}`);
@@ -145,6 +239,12 @@ AREAS.forEach((area, a) => {
 
 k.scene("title", () => {
   k.setBackground(COLORS.ink);
+  // The two of them, with a heart floating over their heads.
+  const couple = k.vec2(k.width() / 2, k.height() / 2 - 130);
+  k.add([k.sprite("hannah", { frame: 0 }), k.pos(couple.add(-26, 0)), k.anchor("center"), k.scale(3)]);
+  k.add([k.sprite("nathan"), k.pos(couple.add(26, 0)), k.anchor("center"), k.scale(3)]);
+  const heart = k.add([k.text("♥", { size: 20 }), k.pos(couple.add(0, -52)), k.anchor("center"), k.color(COLORS.accent)]);
+  heart.onUpdate(() => { heart.pos.y = couple.y - 52 + Math.sin(k.time() * 2) * 3; });
   k.add([
     k.text(CONFIG.title, { size: 36 }),
     k.pos(k.width() / 2, k.height() / 2 - 40),
@@ -214,7 +314,7 @@ k.scene("prologue", () => {
 k.scene("area", (index) => {
   const area = AREAS[index];
   k.setBackground(k.Color.fromHex(area.background ?? "#1a1420"));
-  k.camScale(ZOOM);
+  k.setCamScale(ZOOM);
 
   const cols = area.map[0].length;
   const mapW = cols * TILE;
@@ -223,6 +323,7 @@ k.scene("area", (index) => {
   const cells = layout(area);
 
   k.add([k.sprite(`map-${index}`), k.pos(0, 0), k.z(0)]);
+  k.add([k.sprite(`map-${index}-above`), k.pos(0, 0), k.z(15)]);
   // Night chapters get a blue tint over the world (under the HUD and popups).
   if (area.night) k.add([k.rect(k.width(), k.height()), k.color(11, 16, 48), k.opacity(0.4), k.fixed(), k.z(50)]);
 
@@ -257,12 +358,10 @@ k.scene("area", (index) => {
     if (ch === area.goal?.tile) goalSpots.push(center);
     if (cell.object?.startsWith("uhaulBack")) truckBack.push(cell);
     if (area.details?.[ch]) details.push({ pos: center, lines: area.details[ch], seen: false });
-    if (area.night && (cell.object === "bulbs" || cell.object === "tableCandle")) {
+    if (area.night && GLOWS[cell.object]) {
       // Warm light that shows through the night tint.
-      const bulb = cell.object === "bulbs";
-      const spots = bulb ? [k.vec2(-4, -2), k.vec2(4, -2)] : [k.vec2(0, -2)];
-      for (const offset of spots) {
-        const glow = k.add([k.circle(bulb ? 3.5 : 7), k.pos(center.add(offset)), k.color(255, 214, 122), k.opacity(0.22), k.z(51)]);
+      for (const [x, y, radius] of GLOWS[cell.object]) {
+        const glow = k.add([k.circle(radius), k.pos(center.add(x, y)), k.color(255, 214, 122), k.opacity(0.22), k.z(51)]);
         const phase = k.rand(0, 6);
         glow.onUpdate(() => { glow.opacity = 0.2 + 0.05 * Math.sin(k.time() * 3 + phase); });
       }
@@ -489,7 +588,7 @@ k.scene("area", (index) => {
     // Snapping to whole screen pixels keeps the pixel art from shimmering.
     const clampAxis = (v, size, view) => (size <= view ? size / 2 : k.clamp(v, view / 2, size - view / 2));
     const snap = (v) => Math.round(v * ZOOM) / ZOOM;
-    k.camPos(
+    k.setCamPos(
       snap(clampAxis(player.pos.x, mapW, k.width() / ZOOM)),
       snap(clampAxis(player.pos.y, mapH, k.height() / ZOOM)),
     );
