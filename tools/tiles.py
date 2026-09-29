@@ -772,9 +772,21 @@ def uhaul(part, side):
     return t
 
 
-def dumpster():
-    t = Tile().box(0, 3, 15, 14, "p").rect(1, 4, 14, 6, "P").rect(0, 7, 15, 7, "o")
-    return t.rect(2, 9, 13, 9, "P").px(2, 15, "o").px(13, 15, "o")
+def dumpster(piece=None):
+    """A green dumpster with black lids. Two side by side join into one (L, R)."""
+    t = Tile().rect(0, 2, 15, 13, "o").rect(0, 3, 15, 5, "B").rect(0, 4, 15, 4, "|")
+    t.rect(0, 6, 15, 6, "o").rect(0, 7, 15, 12, "p").rect(0, 12, 15, 12, "P")
+    t.where(lambda x, y: 7 <= y <= 11 and x % 5 == 2, "P")
+    t.rect(0, 14, 15, 14, ".").px(3, 14, "|").px(3, 15, "o").px(12, 14, "|").px(12, 15, "o")
+    if piece in (None, "L"):
+        t.rect(0, 2, 0, 13, "o")
+    if piece in (None, "R"):
+        t.rect(15, 2, 15, 13, "o")
+    if piece == "L":
+        t.px(12, 14, ".").px(12, 15, ".")
+    if piece == "R":
+        t.px(3, 14, ".").px(3, 15, ".")
+    return t
 
 
 def box():
@@ -836,6 +848,649 @@ def cone():
         "................",
         "................",
     ])
+
+
+# ---------- the alley (chapter 4) ----------
+
+def alley(extra=None):
+    """Worn concrete, poured in slabs. Variants: a crack, an asphalt patch,
+    weeds in a crack, a puddle."""
+    t = Tile().fill("s").where(lambda x, y: (x * 5 + y * 11) % 17 == 0, "x").rect(15, 0, 15, 15, "x")
+    if extra == "crack":
+        t.art([
+            "xx..........",
+            "..xo........",
+            "....ox......",
+            "......oxx...",
+            "........xo..",
+            "......x...ox",
+            ".....x......",
+        ], 2, 5)
+    if extra == "patch":
+        t.rect(3, 5, 11, 11, "D").rect(4, 4, 10, 12, "D").where(lambda x, y: 4 <= x <= 10 and 5 <= y <= 11 and (x + y) % 5 == 0, "d")
+    if extra == "weeds":
+        t.art(["x.o.x", ".oxo.", "..o.."], 4, 10).art(["v.h.v", ".vVv.", "..V.."], 4, 7)
+    if extra == "puddle":
+        t.rect(4, 7, 12, 10, "c").rect(3, 8, 13, 9, "c").rect(5, 8, 11, 9, "C").px(6, 8, "q").px(7, 8, "q")
+    return t
+
+
+def alley_drain(grate=False):
+    """The shallow gutter down the middle of the alley (and now and then a drain grate)."""
+    t = alley().rect(0, 7, 15, 8, "x").rect(0, 9, 15, 9, "S")
+    if grate:
+        t.box(4, 5, 11, 10, "B").where(lambda x, y: 5 <= y <= 9 and 5 <= x <= 10 and x % 2 == 0, "|")
+    return t
+
+
+def shingles(half):
+    """Asphalt shingle garage roof. N is the top row (or a single row); S ends in a gutter."""
+    t = Tile().fill("D").where(lambda x, y: y % 4 == 3, "d")
+    t.where(lambda x, y: y % 4 != 3 and (x + (3 if (y // 4) % 2 else 0)) % 6 == 5, "d")
+    if half == "N":
+        return t.rect(0, 0, 15, 0, "o")
+    return t.rect(0, 13, 15, 13, "o").rect(0, 14, 15, 14, "I").rect(0, 15, 15, 15, "i")
+
+
+def garage(piece):
+    """A garage facing the alley: vinyl siding and a roll-up door. A row joins
+    up: L and R are siding and the door frame, M is door (M2 has a tag on it)."""
+    t = Tile().fill("y").where(lambda x, y: y % 3 == 2, "j").rect(0, 0, 15, 1, "L").rect(0, 1, 15, 1, "l")
+    x0, x1 = {"L": (6, 15), "R": (0, 9)}.get(piece, (0, 15))
+    t.rect(x0, 3, x1, 15, "I").where(lambda x, y: x0 <= x <= x1 and y >= 3 and y % 3 == 0, "i")
+    t.rect(x0, 3, x1, 3, "o")
+    if piece == "L":
+        t.rect(5, 3, 5, 15, "o").art([".o.", "oYo", ".o."], 1, 3)
+    if piece == "R":
+        t.rect(10, 3, 10, 15, "o")
+    if piece == "M2":
+        t.art([
+            "!!.//.YY",
+            "!..//.Y.",
+            "!!./.YYY",
+            "..//...Y",
+            "!!/..YY.",
+        ], 4, 6)
+    return t.rect(0, 15, 15, 15, "x")
+
+
+def fence(gate=False):
+    """A wooden privacy fence (or its gate, with a Z brace and a latch)."""
+    t = Tile().rect(0, 1, 15, 15, "F").where(lambda x, y: x % 4 == 3, "f")
+    for x in range(0, 16, 4):
+        t.px(x, 0, "o").px(x + 1, 0, "o").px(x + 2, 0, "o").px(x, 1, "o").px(x + 2, 1, "o")
+        t.px(x, 0, ".").px(x + 2, 0, ".")
+    t.rect(0, 4, 15, 4, "f").rect(0, 12, 15, 12, "f").rect(0, 15, 15, 15, "o")
+    if gate:
+        t.rect(0, 1, 0, 15, "o").rect(15, 1, 15, 15, "o")
+        t.where(lambda x, y: 5 <= y <= 11 and abs(x - (y - 5) * 2 - 1) <= 1, "f")
+        t.rect(12, 7, 13, 8, "Z").rect(1, 5, 2, 5, "|").rect(1, 11, 2, 11, "|")
+    return t
+
+
+def chain_link():
+    """Chain-link fence: posts, a top rail and see-through mesh."""
+    t = Tile().where(lambda x, y: y >= 2 and ((x + y) % 4 == 0 or (x - y) % 4 == 0), "z")
+    return t.rect(0, 1, 15, 1, "Z").rect(0, 0, 0, 15, "Z").rect(1, 0, 1, 15, "z").rect(0, 15, 15, 15, "z")
+
+
+def porch(piece):
+    """A Chicago back porch: wooden decks stacked up the back of the building,
+    one level per row. L and R have the corner posts; M shows a window behind."""
+    t = brick_window() if piece == "M" else brick()
+    t.rect(0, 0, 15, 1, "T").rect(0, 2, 15, 2, "t").rect(0, 3, 15, 3, "o")
+    t.rect(0, 9, 15, 9, "T").rect(0, 10, 15, 10, "o")
+    t.where(lambda x, y: 11 <= y <= 15 and x % 3 == 1, "T").where(lambda x, y: 11 <= y <= 15 and x % 3 == 2, "t")
+    if piece == "L":
+        t.rect(1, 0, 3, 15, "T").rect(3, 0, 3, 15, "t").rect(0, 0, 0, 15, "o").rect(4, 3, 4, 15, "o")
+    if piece == "R":
+        t.rect(12, 0, 14, 15, "T").rect(14, 0, 14, 15, "t").rect(15, 0, 15, 15, "o").rect(11, 3, 11, 15, "o")
+    return t
+
+
+def porch_stairs():
+    """The porch stairs, coming down to the yard, with the shade underneath."""
+    t = brick().rect(0, 0, 15, 1, "T").rect(0, 2, 15, 2, "t").rect(0, 3, 15, 3, "o")
+    for i in range(6):
+        x0, x1, y = round(i * 16 / 6), round((i + 1) * 16 / 6) - 1, 4 + 2 * i
+        t.rect(x0, y, x1, y, "F").rect(x0, y + 1, x1, y + 1, "f").rect(x0, y + 2, x1, 15, "B")
+        t.px(x0, y, "o")
+    for x in range(16):
+        y = round(x * 0.7)
+        if y >= 4:
+            t.px(x, y, "T").px(x, y + 1, "o")
+    return t
+
+
+def brick_tan(window=False):
+    """Tan brick (plain, or with a window), for a building that isn't red."""
+    return recolor(brick_window() if window else brick(), {"M": "j", "m": "J"})
+
+
+def downspout():
+    """A metal downspout running down a brick wall."""
+    t = brick().rect(10, 0, 12, 15, "o").rect(11, 0, 11, 15, "Z").px(12, 0, "z")
+    for y in (3, 11):
+        t.rect(9, y, 13, y, "o")
+    return t
+
+
+def meters():
+    """Electric meters on the back wall, one per unit, with conduit running up."""
+    t = brick().rect(7, 0, 8, 3, "z").rect(7, 0, 7, 3, "Z")
+    for x0 in (2, 6, 10):
+        t.box(x0, 4, x0 + 3, 10, "Z").circle(x0 + 1.5, 6.5, 1.2, "g").px(x0 + 1, 9, "z").px(x0 + 2, 9, "z")
+    return t.rect(1, 11, 14, 11, "z").rect(2, 12, 13, 12, "o")
+
+
+def glass_block():
+    """A glass-block window, the kind every Chicago basement and bathroom has."""
+    t = brick().box(3, 5, 12, 13, "g", edge="i")
+    t.where(lambda x, y: 4 <= x <= 11 and 6 <= y <= 12 and (x % 3 == 0 or y % 3 == 0), "i")
+    return t.where(lambda x, y: 4 <= x <= 11 and 6 <= y <= 12 and (x + y) % 5 == 0 and x % 3 and y % 3, "G").rect(3, 14, 12, 14, "1")
+
+
+def dryer_vent():
+    """A dryer vent: a little metal hood with louvers."""
+    t = brick().box(5, 6, 10, 11, "Z").rect(6, 8, 9, 8, "z").rect(6, 10, 9, 10, "z")
+    return t.rect(5, 12, 10, 12, "m")
+
+
+def gangway():
+    """The narrow, shady gap between two buildings."""
+    return Tile().fill("|").rect(9, 0, 15, 15, "B").where(lambda x, y: x >= 9 and (x * 3 + y * 5) % 11 == 0, "d")
+
+
+def grill():
+    """A kettle grill in the yard."""
+    return Tile().art([
+        "................",
+        "................",
+        "................",
+        "................",
+        "......oZZo......",
+        "....oo||||oo....",
+        "...o|BBBBBB|o...",
+        "..o|BBzBBBBB|o..",
+        "..o|BBBBBBBB|o..",
+        "..oooooooooooo..",
+        "..o|BBBBBBBB|o..",
+        "...o|BBBBBB|o...",
+        "....oo||||oo....",
+        ".....o.oo.o.....",
+        "....o..oo..o....",
+        "...o...oo...o...",
+    ])
+
+
+def back_door():
+    """A steel back door with a little light over it."""
+    t = brick().rect(4, 3, 11, 15, "o").rect(5, 4, 10, 15, "z").rect(5, 4, 10, 4, "Z")
+    return t.rect(6, 6, 9, 8, "G").px(6, 6, "g").px(9, 10, "Y").rect(6, 1, 9, 2, "3").rect(6, 0, 9, 0, "o")
+
+
+def cart(body, shade, lid):
+    """A city garbage cart: lid, hinge handle, wheels."""
+    t = Tile().art([
+        "................",
+        "................",
+        "...oooooooooo...",
+        "..oLLLLLLLLLLo..",
+        "..oooooooooooo..",
+        "...oBBBBBBBBo...",
+        "...oBBBBBBBSo...",
+        "...oBBBBBBBSo...",
+        "...oBBIIIBBSo...",
+        "...oBBBBBBBSo...",
+        "....oBBBBBBSo...",
+        "....oBBBBBBSo...",
+        "....oBBBBBBSo...",
+        "....oooooooo....",
+        "...o|o....o|o...",
+        "....o......o....",
+    ])
+    return recolor(t, {"B": body, "S": shade, "L": lid})
+
+
+def utility_pole(top=False):
+    """A wooden utility pole. Its top (crossarm, insulators and a transformer) goes in the tile above."""
+    if top:
+        return Tile().art([
+            "................",
+            "................",
+            ".I............I.",
+            "oIoooooooooooIIo",
+            "ottttttttttttttto"[:16],
+            "oooooooTtoooooo.",
+            ".....ZZTtZ......",
+            "....oZzTtzo.....",
+            "....oZzTtzo.....",
+            "....oZzTtzo.....",
+            ".....ooTtoo.....",
+            ".......Tt.......",
+            ".......Tt.......",
+            ".......Tt.......",
+            ".......Tt.......",
+            ".......Tt.......",
+        ])
+    return Tile().art([
+        ".......Tt.......",
+        ".......Tt.......",
+        ".......Tt.......",
+        ".......Tt.......",
+        ".......Tt.......",
+        "......oYYo......",
+        ".......Tt.......",
+        ".......Tt.......",
+        ".......Tt.......",
+        ".......Tt.......",
+        ".......Tt.......",
+        ".......Tt.......",
+        "......oTto......",
+        ".....ooTtoo.....",
+        "....ooooooo.....",
+        "................",
+    ])
+
+
+def wires():
+    """Power lines strung between the poles, sagging a little."""
+    t = Tile()
+    for base in (3, 6):
+        t.where(lambda x, y, base=base: y == base + round(1.2 * (1 - ((x - 7.5) / 7.5) ** 2)), "o")
+    return t
+
+
+def mattress(half):
+    """An old mattress left leaning against the fence. Two tiles tall."""
+    t = Tile(16, 32).box(3, 6, 12, 30, "L").where(lambda x, y: 4 <= x <= 11 and 7 <= y <= 29 and x % 3 == 0, "C")
+    t.where(lambda x, y: 4 <= x <= 11 and 7 <= y <= 29 and (x * 2 + y) % 11 == 0, "l")
+    t.rect(4, 7, 11, 7, "l").rect(3, 31, 12, 31, ".")
+    t.rect(3, 30, 12, 30, "o").px(8, 20, "j").px(9, 20, "j").px(9, 21, "j")
+    top, bottom = Tile(), Tile()
+    top.g, bottom.g = t.g[:16], t.g[16:]
+    return top if half == "N" else bottom
+
+
+def trash_bags():
+    return Tile().art([
+        "................",
+        "................",
+        "................",
+        "................",
+        ".......o........",
+        "......o|o.......",
+        ".....oBBBo..o...",
+        "....oBzBBBoo|o..",
+        "...oBzBBBBBoBBo.",
+        "...oBBBBBBBBzBBo",
+        "..oooBBBBB|BBBBo",
+        ".oBzBoBBB|BBBB|o",
+        ".oBBBBoo||BBB||o",
+        ".oBBBBBoooooooo.",
+        "..ooooo.........",
+        "................",
+    ])
+
+
+def cat():
+    """An orange tabby who is supervising."""
+    return Tile().art([
+        "................",
+        "................",
+        "................",
+        "................",
+        "....o...o.......",
+        "...o@o.o@o......",
+        "...o@@o@@o......",
+        "...o@V@V@o......",
+        "...o@@!@@o......",
+        "....o@@@o.......",
+        "....o@$$@o......",
+        "...o@$@@$@o.oo..",
+        "...o@$@@$@o.o@o.",
+        "...o@@@@@@oo@o..",
+        "....oLoooLooo...",
+        "................",
+    ])
+
+
+# ---------- Decker's Bagels (chapter 5, morning) ----------
+
+# A tiny 3x5 font for signs.
+LETTERS = {
+    "D": ["##.", "#.#", "#.#", "#.#", "##."],
+    "E": ["###", "#..", "##.", "#..", "###"],
+    "C": [".##", "#..", "#..", "#..", ".##"],
+    "K": ["#.#", "#.#", "##.", "#.#", "#.#"],
+    "R": ["##.", "#.#", "##.", "#.#", "#.#"],
+    "S": [".##", "#..", ".#.", "..#", "##."],
+    "'": ["#", "#", ".", ".", "."],
+}
+
+BAGEL = [
+    ".ooo.",
+    "o@$@o",
+    "o$.$o",
+    "o@$@o",
+    ".ooo.",
+]
+
+
+def write(t, x, y, text, ch):
+    for letter in text:
+        rows = LETTERS[letter]
+        for dy, row in enumerate(rows):
+            for dx, p in enumerate(row):
+                if p == "#":
+                    t.px(x + dx, y + dy, ch)
+        x += len(rows[0]) + 1
+    return t
+
+
+def decker_sign():
+    """The pop-up's signboard, three tiles wide: DECKER'S between two bagels."""
+    t = Tile(48, 16)
+    t.paste(brick()).paste(brick(), 16).paste(brick(), 32)
+    t.rect(1, 3, 46, 13, "o").rect(2, 4, 45, 12, "B").rect(2, 4, 45, 4, "|")
+    write(t, 9, 6, "DECKER'S", "I")
+    t.art(BAGEL, 3, 6).art(BAGEL, 40, 6)
+    return t.split()
+
+
+def popup_window(piece):
+    """The pop-up's service window, three tiles wide: glass on the sides (L, R)
+    and the open window in the middle (M), with a steel ledge in front."""
+    t = brick()
+    if piece == "M":
+        t.rect(0, 1, 15, 11, "o").rect(1, 2, 14, 10, "B").rect(1, 2, 14, 3, "3")
+        t.rect(1, 6, 14, 6, "T").art(["@$.@$.@$"], 3, 5)
+    else:
+        t.rect(0, 1, 15, 11, "o").rect(1, 2, 14, 10, "G").px(3, 3, "g").px(4, 3, "g").px(3, 4, "g")
+        t.art(BAGEL, 6 if piece == "L" else 5, 5)
+    t.rect(0, 11, 15, 11, "o").rect(0, 12, 15, 12, "Z").rect(0, 13, 15, 13, "z").rect(0, 14, 15, 14, "o")
+    if piece == "L":
+        t.rect(0, 1, 0, 14, "o")
+    if piece == "R":
+        t.rect(15, 1, 15, 14, "o")
+    return t
+
+
+def pickup_table():
+    """A little table by the window with a paper bag on it: HANNAH, and a heart."""
+    return Tile().art([
+        "................",
+        ".....oooooo.....",
+        "....ojjjjjjo....",
+        "....oJJJJJJo....",
+        "....ojjjjjjo....",
+        "....ojRjjRjo....",
+        "....ojRRRRjo....",
+        "..ooojjRRjjooo..",
+        ".oTTojjjjjjoTTo.",
+        ".oTToooooooTTTo.",
+        ".oTTTTTTTTTTTTo.",
+        ".otttttttttttto.",
+        ".oooooooooooooo.",
+        "..o..........o..",
+        "..o..........o..",
+        "..o..........o..",
+    ])
+
+
+def bagel_menu():
+    """A chalkboard sandwich board with bagels drawn on it."""
+    t = menu_board().rect(4, 3, 11, 11, "B")
+    t.art([".lll.", "l...l", "l.l.l", "l...l", ".lll."], 4, 3)
+    return t.rect(10, 4, 11, 4, "l").rect(10, 6, 11, 6, "l").rect(4, 9, 11, 9, "l").rect(4, 11, 9, 11, "l")
+
+
+def bike_rack():
+    t = Tile()
+    for x0 in (1, 6, 11):
+        t.rect(x0, 5, x0, 13, "z").rect(x0 + 3, 5, x0 + 3, 13, "z").rect(x0, 4, x0 + 3, 4, "Z")
+        t.px(x0, 4, "o").px(x0 + 3, 4, "o")
+    return t.rect(0, 14, 15, 14, "o")
+
+
+# ---------- Yokocho (chapter 5, dinner) ----------
+
+def wood_dark():
+    t = Tile().fill("u").where(lambda x, y: y % 4 == 3, "b")
+    return t.where(lambda x, y: y % 4 != 3 and x == (y // 4 * 7 + 2) % 16, "b")
+
+
+def slate():
+    return Tile().fill("d").where(lambda x, y: x % 8 == 7 or y % 8 == 7, "|")
+
+
+def slat_wall():
+    """Dark wood slats, floor to ceiling."""
+    return Tile().fill("b").where(lambda x, y: x % 3 == 0, "u").where(lambda x, y: x % 3 == 2, "|")
+
+
+def box_sign(marks):
+    """A lit box sign on the slats, the kind that flank the bar."""
+    t = slat_wall().box(3, 1, 12, 14, "=", edge="o").rect(4, 2, 11, 2, "3")
+    glyph(t, 5, 3, marks[0], "R")
+    return glyph(t, 5, 9, marks[1], "B")
+
+
+def sake_shelf():
+    """Shelves of sake bottles against the back wall."""
+    t = slat_wall()
+    for shelf, bottles in ((7, ((1, "V"), (4, "I"), (7, "/"), (10, "@"), (13, "V"))),
+                           (14, ((2, "@"), (5, "/"), (8, "I"), (11, "V")))):
+        for x, ch in bottles:
+            t.rect(x, shelf - 5, x + 1, shelf - 1, ch).rect(x, shelf - 5, x + 1, shelf - 5, "o")
+        t.rect(0, shelf, 15, shelf, "T").rect(0, shelf + 1, 15, shelf + 1, "t") if shelf < 15 else None
+    return t
+
+
+def noren():
+    """A doorway with a split indigo curtain."""
+    t = Tile().fill("B").rect(0, 0, 15, 1, "T").rect(0, 0, 0, 15, "T").rect(15, 0, 15, 15, "T")
+    t.rect(1, 2, 14, 9, "/").rect(7, 2, 8, 9, "B").rect(1, 9, 6, 9, "c").rect(9, 9, 14, 9, "c")
+    return t.circle(4, 5, 1.6, "I").circle(11, 5, 1.6, "I")
+
+
+def hinoki(piece, item=None):
+    """The U-shaped counter in pale hinoki wood. "front" is the bottom of the U
+    (its front faces the room), "L"/"R" are the arms, "BL"/"BR" the corners."""
+    t = Tile()
+    if piece in ("front", "BL", "BR"):
+        t.rect(0, 0, 15, 8, "y").where(lambda x, y: y <= 8 and (x * 3 + y * 7) % 13 == 0, "e")
+        t.rect(0, 9, 15, 9, "o").rect(0, 10, 15, 14, "u").where(lambda x, y: 10 <= y <= 14 and x % 4 == 3, "b")
+        t.rect(0, 15, 15, 15, "o")
+        if piece == "BL":
+            t.rect(0, 0, 1, 15, ".").rect(2, 0, 2, 15, "o")
+        if piece == "BR":
+            t.rect(14, 0, 15, 15, ".").rect(13, 0, 13, 15, "o")
+    else:
+        x0, x1 = (2, 13)
+        t.rect(x0, 0, x1, 15, "y").where(lambda x, y: x0 <= x <= x1 and (x * 3 + y * 7) % 13 == 0, "e")
+        t.rect(x0 - 1, 0, x0 - 1, 15, "o").rect(x1 + 1, 0, x1 + 1, 15, "o")
+        side = x0 - 2 if piece == "L" else x1 + 2
+        t.rect(side, 0, side, 15, "u")
+    if item == "handroll":
+        t.art(["..oo.", ".oBVo", "oBIRo", "oBBo.", ".oo.."], 5, 2)
+    if item == "sake":
+        t.art(["oIo.oIo", "oio.oio", "ooo.ooo"], 4, 3).art([".oo.", "oIIo", "oIIo", ".oo."], 11, 1)
+    if item == "case":
+        t.box(1, 0, 14, 7, "g", edge="z").rect(2, 5, 13, 6, "I").art(["RRr.@@$.!!R"], 3, 4).px(3, 1, "I")
+    if item == "sando":
+        t.rect(3, 6, 12, 7, "i").rect(2, 5, 13, 5, "I")
+        t.art(["oLLLLLo", "oLL!!Lo", "o!!V!!o", "oLVVLLo", "oLLLLLo"], 4, 0)
+    return t
+
+
+def stool():
+    return Tile().art([
+        "................",
+        "................",
+        "................",
+        "................",
+        "....oooooooo....",
+        "...oTTTTTTTTo...",
+        "...otTTTTTTto...",
+        "....oooooooo....",
+        ".....oo..oo.....",
+        ".....oo..oo.....",
+        ".....oo..oo.....",
+        "....oooooooo....",
+        ".....oo..oo.....",
+        ".....oo..oo.....",
+        "................",
+        "................",
+    ])
+
+
+def andon():
+    """A standing lit sign on legs."""
+    t = Tile().box(3, 1, 12, 12, "=", edge="o").rect(4, 2, 11, 2, "3")
+    glyph(t, 5, 5, 3, "R")
+    return t.rect(4, 13, 4, 15, "o").rect(11, 13, 11, 15, "o").rect(4, 13, 11, 13, "T")
+
+
+def prep_counter():
+    """The chefs' back counter: a wooden rice tub, a cutting board and a knife."""
+    return Tile().art([
+        "oooooooooooooooo",
+        "oZZZZZZZZZZZZZZo",
+        "oZ.oooo.ZZZZZZZo",
+        "ZoTIIIIToTTTTTZo",
+        "ZoTIIIITotttttZo",
+        "Z.oTTTTo.ZzzzZZo",
+        "ZZ.oooo.ZZZZZZZo",
+        "oooooooooooooooo",
+        "ozzzzzzzzzzzzzzo",
+        "ozzzzzzozzzzzzzo",
+        "ozzzzzzozzzzzzzo",
+        "ozzzzzzozzzzzzzo",
+        "ozzzzzzzzzzzzzzo",
+        "oooooooooooooooo",
+        "................",
+        "................",
+    ])
+
+
+# ---------- the view from Chateau Carbide (chapter 5, drinks) ----------
+
+VIEW_W, VIEW_H = 224, 64
+
+
+def lit_windows(t, x0, x1, y0, y1, on, off, step=(2, 3), seed=0):
+    """A grid of windows, some lit, picked from a hash so it's the same every time."""
+    for y in range(y0, y1 + 1, step[1]):
+        for x in range(x0, x1 + 1, step[0]):
+            h = (x * 73856093 ^ y * 19349663 ^ seed * 83492791) & 0xFFFF
+            t.px(x, y, on if h % 5 < 2 else off)
+
+
+def skyline_view():
+    """Looking out from the roof at night: stars, the moon, and (left to right)
+    Willis Tower, Marina City's corncobs, Trump Tower, the Wrigley Building's
+    lit clock tower, the Aon Center and the Hancock, with the rest of the city
+    glowing in between. 14 tiles wide, 4 tall."""
+    t = Tile(VIEW_W, VIEW_H).fill("8")
+    t.where(lambda x, y: y >= 44 or (y >= 38 and (x + y) % 2 == 0), "9")
+    t.where(lambda x, y: y < 36 and (x * 7 + y * 13) % 97 == 0, "L")
+    t.where(lambda x, y: y < 30 and (x * 11 + y * 5) % 131 == 0, "3")
+    t.circle(196, 9, 5, "L").circle(198, 8, 4.2, "8").px(191, 9, "i").px(192, 12, "i")
+
+    # The city behind: low towers with scattered lights.
+    x = 0
+    for w, h in ((9, 18), (7, 26), (10, 14), (6, 22), (8, 30), (11, 17), (7, 24), (9, 20), (6, 28), (10, 16),
+                 (8, 25), (7, 19), (9, 27), (6, 15), (10, 23), (8, 18), (7, 29), (9, 21), (6, 16), (11, 26),
+                 (8, 20), (7, 24), (9, 17), (8, 22), (6, 19), (10, 25), (7, 18)):
+        t.rect(x, VIEW_H - h, x + w - 1, VIEW_H - 1, "B")
+        lit_windows(t, x + 1, x + w - 2, VIEW_H - h + 2, VIEW_H - 2, "3", "B", seed=x)
+        x += w
+        if x >= VIEW_W:
+            break
+
+    def tower(x0, x1, top, body, on, off, seed):
+        t.rect(x0, top, x1, VIEW_H - 1, body)
+        lit_windows(t, x0 + 1, x1 - 1, top + 2, VIEW_H - 2, on, off, seed=seed)
+
+    # Willis Tower: black, stepped, with its two white antennas.
+    tower(6, 25, 16, "|", "3", "B", 1)
+    tower(9, 22, 10, "|", "3", "B", 2)
+    tower(12, 19, 6, "|", "3", "B", 3)
+    for ax in (13, 18):
+        t.rect(ax, 0, ax, 5, "Z").px(ax, 0, "R")
+
+    # Marina City: two round towers, balconies lit in rings.
+    for x0 in (38, 49):
+        t.rect(x0, 30, x0 + 8, VIEW_H - 1, "z").rect(x0 + 1, 29, x0 + 7, 29, "z")
+        t.where(lambda x, y, x0=x0: x0 <= x <= x0 + 8 and y >= 31 and y % 3 == 0, "=")
+        t.where(lambda x, y, x0=x0: x0 <= x <= x0 + 8 and y >= 31 and y % 3 == 1 and x in (x0, x0 + 8), "Z")
+        t.px(x0, 29, "8").px(x0 + 8, 29, "8").rect(x0 + 2, 28, x0 + 6, 28, "Z")
+
+    # Trump Tower: tall silver glass with setbacks and a spire.
+    tower(66, 82, 20, "C", "=", "c", 4)
+    tower(68, 80, 13, "C", "=", "c", 5)
+    tower(71, 77, 8, "C", "=", "c", 6)
+    t.rect(74, 0, 74, 7, "Z").px(74, 0, "R")
+    t.where(lambda x, y: 66 <= x <= 82 and y >= 8 and x % 4 == 1 and t.g[y][x] == "C", "Z")
+
+    # The Wrigley Building: bright white, clock tower and cupola.
+    t.rect(94, 36, 116, VIEW_H - 1, "I")
+    lit_windows(t, 95, 115, 38, VIEW_H - 2, "3", "i", seed=7)
+    t.rect(101, 22, 109, 35, "I").rect(103, 17, 107, 21, "I").rect(104, 13, 106, 16, "i").px(105, 11, "Z").px(105, 12, "Z")
+    t.circle(105, 27, 2.6, "L").px(105, 27, "o").px(105, 26, "o").px(106, 27, "o")
+    t.where(lambda x, y: 101 <= x <= 109 and y in (31, 33), "i")
+
+    # The Aon Center: a tall pale slab with vertical stripes.
+    t.rect(134, 12, 146, VIEW_H - 1, "i").where(lambda x, y: 134 <= x <= 146 and y >= 12 and x % 3 == 1, "Z")
+    lit_windows(t, 135, 145, 14, VIEW_H - 2, "=", "Z", step=(3, 2), seed=8)
+
+    # The Hancock: dark, tapered, cross-braced, with two antennas.
+    for y in range(8, VIEW_H):
+        half = 5 + (y - 8) * 3 // (VIEW_H - 8)
+        t.rect(170 - half, y, 170 + half, y, "|")
+    t.where(lambda x, y: y >= 10 and abs(x - 170) <= 7 and t.g[y][x] == "|" and (x - 170 + y) % 12 == 0, "z")
+    t.where(lambda x, y: y >= 10 and abs(x - 170) <= 7 and t.g[y][x] == "|" and (170 - x + y) % 12 == 0, "z")
+    lit_windows(t, 166, 174, 12, VIEW_H - 2, "3", "|", step=(2, 4), seed=9)
+    for ax in (168, 172):
+        t.rect(ax, 0, ax, 7, "Z").px(ax, 0, "R")
+    return t
+
+
+def view_pieces():
+    """The view cut into 16x16 tiles: name_row_col (see pictures in main.js)."""
+    view = skyline_view()
+    pieces = {}
+    for r in range(VIEW_H // 16):
+        for c in range(VIEW_W // 16):
+            piece = Tile()
+            piece.g = [row[c * 16:(c + 1) * 16] for row in view.g[r * 16:(r + 1) * 16]]
+            pieces[f"view_{r}_{c}"] = piece
+    return pieces
+
+
+VIEW = view_pieces()
+
+
+def dj_booth(piece):
+    """The DJ's table, two tiles wide: a turntable on each side, the mixer in
+    the middle, and a strip of light along the front."""
+    t = Tile().rect(0, 2, 15, 15, "o").rect(0, 3, 15, 6, "z").rect(0, 7, 15, 7, "o")
+    t.rect(0, 8, 15, 14, "|").rect(0, 11, 15, 11, "*").rect(0, 12, 15, 12, "!")
+    if piece == "L":
+        t.rect(0, 2, 0, 15, "o").circle(7, 4.5, 2.6, "B").circle(7, 4.5, 1.8, "|").px(7, 4, "R").rect(11, 3, 11, 5, "Z")
+        t.rect(13, 3, 15, 6, "B").rect(14, 3, 14, 6, "z").px(14, 4, "I")
+    else:
+        t.rect(15, 2, 15, 15, "o").circle(8, 4.5, 2.6, "B").circle(8, 4.5, 1.8, "|").px(8, 4, "R").rect(4, 3, 4, 5, "Z")
+        t.rect(0, 3, 2, 6, "B").rect(1, 3, 1, 6, "z").px(1, 5, "I")
+    return t
+
+
+def speaker():
+    """A tall PA speaker: a small cone over a big one."""
+    t = Tile().box(3, 1, 12, 14, "|").rect(3, 15, 12, 15, ".")
+    t.circle(7.5, 4.5, 2.2, "o").circle(7.5, 4.5, 1.2, "B").px(7, 4, "z")
+    return t.circle(7.5, 10, 3.2, "o").circle(7.5, 10, 2.2, "B").circle(7.5, 10, 1, "z")
 
 
 # ---------- Chateau Carbide rooftop (chapter 5) ----------
@@ -1116,6 +1771,244 @@ def nightstand():
         "..otttttttttto..",
         "..oooooooooooo..",
         "...o........o...",
+        "................",
+    ])
+
+
+def rug_blue():
+    t = Tile().fill("C").where(lambda x, y: (x + y) % 8 == 4 or (x - y) % 8 == 4, "c")
+    return t.where(lambda x, y: x % 8 == 0 and y % 8 == 0, "L")
+
+
+def rug_cream():
+    t = Tile().fill("y").where(lambda x, y: y % 8 in (3, 4), "j")
+    return t.where(lambda x, y: y % 8 in (3, 4) and x % 4 == 1, "R")
+
+
+def rug_runner():
+    """A striped runner down the hall."""
+    return Tile().fill("R").where(lambda x, y: y in (3, 12), "Y").where(lambda x, y: 6 <= y <= 9, "r")
+
+
+def bath_tile():
+    return Tile().fill("I").where(lambda x, y: (x // 4 + y // 4) % 2 == 0, "g").where(lambda x, y: x % 4 == 3 or y % 4 == 3, "i")
+
+
+def wall_art(kind):
+    """A wall face with something hanging on it: a lake painting or a clock."""
+    t = wall_face()
+    if kind == "lake":
+        t.box(3, 4, 12, 10, "q", edge="T").rect(4, 8, 11, 9, "Q").px(10, 6, "Y").px(9, 6, "Y")
+        return t.rect(4, 7, 11, 7, "V").px(5, 6, "V").px(6, 6, "V")
+    return t.circle(7.5, 7, 3.6, "o").circle(7.5, 7, 2.8, "I").rect(7, 5, 7, 7, "o").rect(8, 7, 9, 7, "o")
+
+
+def desk():
+    """A desk with a monitor, keyboard, a mug and a lamp, against the wall."""
+    return Tile().art([
+        "................",
+        "..oooooooo......",
+        "..oBBBBBBo...o..",
+        "..oBzBBBBo..oYo.",
+        "..oBBBBBBo.oYYYo",
+        "..oooooooo..ooo.",
+        ".....oo......o..",
+        "oooooooooooooooo",
+        "oTTTTTTTTTTTTTTo",
+        "oTLLLLLTTTTIiTTo",
+        "otttttttttttttto",
+        "oooooooooooooooo",
+        "oTo..........oTo",
+        "oTo..........oTo",
+        "oto..........oto",
+        "ooo..........ooo",
+    ])
+
+
+def desk_chair():
+    """An office chair, pulled up to the desk (seen from behind)."""
+    return Tile().art([
+        "................",
+        "................",
+        ".....oooooo.....",
+        "....oBBBBBBo....",
+        "....oBBBBBBo....",
+        "....oBBBBBBo....",
+        "....oooooooo....",
+        "...oBBBBBBBBo...",
+        "...ozzzzzzzzo...",
+        "....oooooooo....",
+        ".......oo.......",
+        ".......oo.......",
+        "....oooooooo....",
+        "...o|o.oo.o|o...",
+        "................",
+        "................",
+    ])
+
+
+def dresser():
+    return Tile().art([
+        "................",
+        "..........oooo..",
+        "...oVo....oCgo..",
+        "..oVhVo...oggo..",
+        "...oUo....oooo..",
+        "oooooooooooooooo",
+        "oTTTTTTTTTTTTTTo",
+        "otttttttttttttto",
+        "oTTTYTTTTTTYTTTo",
+        "otttttttttttttto",
+        "oTTTYTTTTTTYTTTo",
+        "otttttttttttttto",
+        "oTTTYTTTTTTYTTTo",
+        "oooooooooooooooo",
+        ".o............o.",
+        "................",
+    ])
+
+
+def bookshelf():
+    return Tile().art([
+        "oooooooooooooooo",
+        "oTTTTTTTTTTTTTTo",
+        "oTRRCYIoRCCTYYTo",
+        "oTRRCYIoRCCTYYTo",
+        "oTRRCYIoRCCTYYTo",
+        "otttttttttttttto",
+        "oTVVoYYRRIICCTTo",
+        "oTVVoYYRRIICCTTo",
+        "oTVVoYYRRIICCTTo",
+        "otttttttttttttto",
+        "oTCCIIRRoYVVTTTo",
+        "oTCCIIRRoYVVTTTo",
+        "oTCCIIRRoYVVTTTo",
+        "otttttttttttttto",
+        "oooooooooooooooo",
+        ".o............o.",
+    ])
+
+
+def floor_lamp():
+    return Tile().art([
+        ".....oooooo.....",
+        "....o333333o....",
+        "...o33333333o...",
+        "...oooooooooo...",
+        ".......oo.......",
+        ".......oo.......",
+        ".......oo.......",
+        ".......oo.......",
+        ".......oo.......",
+        ".......oo.......",
+        ".......oo.......",
+        ".......oo.......",
+        ".....oooooo.....",
+        ".....oBBBBo.....",
+        ".....oooooo.....",
+        "................",
+    ])
+
+
+def coffee_table():
+    """A low table with a magazine and a mug on it."""
+    return Tile().art([
+        "................",
+        "................",
+        "................",
+        ".oooooooooooooo.",
+        ".oTTTTTTTTTTTTo.",
+        ".oTLLlTTTTIiTTo.",
+        ".oTLlLTTTTIiTTo.",
+        ".oTTTTTTTTTTTTo.",
+        ".otttttttttttto.",
+        ".oooooooooooooo.",
+        ".oo..........oo.",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+    ])
+
+
+def vanity():
+    """A bathroom sink on a cabinet, soap on the side."""
+    return Tile().art([
+        "......oo........",
+        ".....oZZo.......",
+        "oooooooooooooooo",
+        "oIIIIIIIIIIIIIIo",
+        "oIIoooooooIIoYIo",
+        "oIoiiiiiiiIoIIIo",
+        "oIoiiiiiiiIoIIIo",
+        "oIIoooooooIIIIIo",
+        "oooooooooooooooo",
+        "oTTTTTToTTTTTTTo",
+        "oTTTTTzoTzTTTTTo",
+        "oTTTTTToTTTTTTTo",
+        "ottttttottttttto",
+        "oooooooooooooooo",
+        "................",
+        "................",
+    ])
+
+
+def shower(half):
+    """A glass shower stall, two tiles tall: showerhead on a tiled wall (N), glass door (S)."""
+    t = Tile()
+    if half == "N":
+        t.fill("I").where(lambda x, y: (x + y) % 2 == 0, "i")
+        t.rect(0, 0, 15, 0, "o").rect(0, 0, 0, 15, "z").rect(15, 0, 15, 15, "z")
+        t.art(["ozzzo", ".oZZo", "oZZZZo"], 5, 2)
+        for x, y in ((6, 6), (8, 7), (10, 6), (7, 9), (9, 10), (6, 11), (10, 12)):
+            t.px(x, y, "Q")
+        return t.rect(1, 13, 14, 13, "z").rect(1, 14, 14, 15, "G").px(3, 14, "g").px(4, 15, "g")
+    t.rect(0, 0, 15, 15, "G").rect(0, 0, 0, 15, "z").rect(15, 0, 15, 15, "z")
+    t.where(lambda x, y: 1 <= x <= 14 and y <= 11 and (x + y) % 9 == 0, "g")
+    t.rect(12, 4, 12, 7, "Z")
+    return t.rect(0, 12, 15, 12, "z").rect(0, 13, 15, 14, "Z").rect(0, 15, 15, 15, "o")
+
+
+def trash_can():
+    return Tile().art([
+        "................",
+        "................",
+        "................",
+        ".....oooooo.....",
+        "....ozzzzzzo....",
+        "....oooooooo....",
+        "....oZZZZZZo....",
+        "....oZzZZzZo....",
+        "....oZzZZzZo....",
+        "....oZzZZzZo....",
+        "....oZzZZzZo....",
+        "....oZZZZZZo....",
+        ".....oooooo.....",
+        "................",
+        "................",
+        "................",
+    ])
+
+
+def coat_rack():
+    """A coat rack by the front door."""
+    return Tile().art([
+        ".......oo.......",
+        "....oooTToooo...",
+        "...oRRoTToCCo...",
+        "..oRRRRoTCCCCo..",
+        "..oRRrRoTCcCCo..",
+        "..oRRrRoTCcCCo..",
+        "..oRRrRoTCCCCo..",
+        "..oRRRRoToCCo...",
+        "...ooooTT.oo....",
+        ".......TT.......",
+        ".......TT.......",
+        ".......TT.......",
+        ".......TT.......",
+        ".....oTTTTo.....",
+        "....oooooooo....",
         "................",
     ])
 
@@ -1417,6 +2310,225 @@ def fruit_stand():
     ])
 
 
+def recolor(t, swaps):
+    """Swap palette letters, e.g. {"R": "Y"} turns red to gold."""
+    t.g = [[swaps.get(ch, ch) for ch in row] for row in t.g]
+    return t
+
+
+def pavers():
+    """Warm stone pavers laid in a running bond (the park plaza)."""
+    t = Tile().fill("2").where(lambda x, y: y % 4 == 3, "x")
+    return t.where(lambda x, y: (x + (4 if (y // 4) % 2 else 0)) % 8 == 7, "x")
+
+
+def lanterns_gold():
+    t = lanterns()
+    return recolor(t, {"R": "Y", "r": "$", "!": "="}).art(["..oRRo..", "", "", "", "", "", "", "..oRRo..", "...RR...", "...R...."], 4, 4)
+
+
+def pagoda(piece):
+    """Green glazed tile roof with a gold ridge and red brackets under the eave.
+    A row of them joins up, and the ends (L, R) curl up at the corners."""
+    t = Tile().rect(0, 1, 15, 1, "o").rect(0, 2, 15, 2, "Y").rect(0, 3, 15, 3, "o")
+    t.rect(0, 4, 15, 10, "+").where(lambda x, y: 4 <= y <= 10 and x % 4 == 0, "-")
+    t.where(lambda x, y: y == 4 and x % 4 != 0, "(")
+    t.rect(0, 11, 15, 11, "o").rect(0, 12, 15, 12, "R")
+    t.where(lambda x, y: y == 13, "r").where(lambda x, y: y == 13 and x % 4 in (1, 2), "Y")
+    t.rect(0, 14, 15, 14, "r").rect(0, 15, 15, 15, "o")
+    if piece == "M":
+        return t
+    # The roof tapers in toward the top, and the eave tip swoops up past the ridge.
+    for y in range(1, 11):
+        edge = 3 if y <= 6 else 2 if y <= 8 else 1
+        for x in range(edge):
+            t.px(x, y, ".")
+        t.px(edge, y, "o")
+    for x in range(2):
+        for y in range(13, 16):
+            t.px(x, y, ".")
+    t.px(2, 13, "o").px(2, 14, "o").px(2, 15, "o")
+    t.art(["o...", "Yo..", "Yo..", "oYo.", ".oYo", "..oo"], 0, 6)
+    t.art(["oo.", "YYo", "oo."], 0, 0)
+    return t.mirror() if piece == "R" else t
+
+
+def gate_beam(piece):
+    """The gate's crossbeams, with a sign between the pillars (M) or the top of
+    a pillar (L, R)."""
+    t = Tile().rect(0, 0, 15, 1, "R").rect(0, 2, 15, 2, "r").rect(0, 3, 15, 3, "o")
+    t.rect(0, 12, 15, 12, "o").rect(0, 13, 15, 13, "R").rect(0, 14, 15, 14, "r").rect(0, 15, 15, 15, "o")
+    if piece in ("L", "R"):
+        t.rect(0, 4, 15, 11, "o").rect(0, 5, 15, 10, "r")
+        t.rect(4, 0, 11, 15, "o").rect(5, 0, 10, 15, "R").rect(9, 0, 10, 15, "r")
+        t.rect(5, 6, 10, 7, "Y").rect(5, 8, 10, 8, "$")
+        return t.mirror() if piece == "R" else t
+    t.rect(0, 4, 15, 4, "$").rect(0, 11, 15, 11, "$").rect(0, 5, 15, 10, "-")
+    return glyph(t, 5, 5, {"M": 2, "M2": 0, "M3": 4}[piece], "Y")
+
+
+def gate_pillar():
+    t = Tile().rect(4, 0, 11, 11, "o").rect(5, 0, 10, 11, "R").rect(9, 0, 10, 11, "r")
+    t.rect(5, 2, 10, 3, "Y").rect(5, 4, 10, 4, "$").px(6, 0, "!").px(6, 1, "!")
+    return t.box(3, 11, 12, 15, "1").rect(4, 14, 11, 14, "2")
+
+
+def brick_sign(board, ink, marks):
+    """A vertical sign mounted flat on a brick wall, two characters tall."""
+    t = brick().box(4, 0, 11, 15, board).rect(12, 1, 12, 15, "m")
+    glyph(t, 5, 2, marks[0], ink)
+    return glyph(t, 5, 9, marks[1], ink)
+
+
+def lion():
+    """A stone guardian lion on its plinth, one paw on a ball (the other one mirrors it)."""
+    return Tile().art([
+        "....oooooo......",
+        "...o212121o.....",
+        "..o21111112o....",
+        "..o2o1111o2o....",
+        "..o21111112o....",
+        "..o21oRRo12o....",
+        "...o221122o.....",
+        "..o2211112oo....",
+        "..o21o11o122o...",
+        ".oZZo1o1o1122o..",
+        ".oZzo1o1o12222o.",
+        "..oooooooooooo..",
+        ".o111111111111o.",
+        ".o222222222222o.",
+        ".oooooooooooooo.",
+        "................",
+    ])
+
+
+def phone_booth(top=False):
+    """Mott Street's pagoda-topped phone booth; the roof goes in the tile above."""
+    if top:
+        return Tile().art([
+            ".......YY.......",
+            "......oYYo......",
+            ".o...o++++o...o.",
+            ".oYoo((((((ooYo.",
+            "..o++++++++++o..",
+            "..oooooooooooo..",
+            "...oRRRRRRRRo...",
+            "...orrrrrrrro...",
+        ], 0, 8)
+    return Tile().art([
+        "...oYYYYYYYYo...",
+        "...oRooooooRo...",
+        "...oRoGGggoRo...",
+        "...oRoGoogoRo...",
+        "...oRoGoBGoRo...",
+        "...oRoGGzGoRo...",
+        "...oRoGgGGoRo...",
+        "...oRoGGGgoRo...",
+        "...oRooooooRo...",
+        "...oRRRRRRRRo...",
+        "...orYrrrrYro...",
+        "...oRRRRRRRRo...",
+        "...orrrrrrrro...",
+        "...oooooooooo...",
+        "................",
+        "................",
+    ])
+
+
+def street_cart():
+    """A steamed bun cart under a red and gold umbrella."""
+    return Tile().art([
+        "......oooo......",
+        "....ooRYYRoo....",
+        "..ooRRRYYRRRoo..",
+        ".oRRRRYYYYRRRRo.",
+        "oRRRRRYYYYRRRRRo",
+        "oooooooooooooooo",
+        ".......oo.......",
+        "...oooooooooo...",
+        "...oJJJJJJJJo...",
+        "...ojjjjjjjjo...",
+        ".ooooooooooooo..",
+        ".oZZZZZZZZZZZo..",
+        ".ozzzzYYYzzzzo..",
+        ".ooooooooooooo..",
+        "..o|o.....o|o...",
+        "...o.......o....",
+    ])
+
+
+def fish_stand():
+    """Whole fish and crabs laid out on ice."""
+    return Tile().art([
+        "................",
+        "................",
+        "................",
+        "................",
+        ".IiIIiIIiIIiIIi.",
+        ".IzZZoIiIRRroIi.",
+        ".IiIIiIzZZoIiII.",
+        ".IRRroIiIIizZZo.",
+        "oJjjJjJjjJjJjjJo",
+        "ojjjjjjjjjjjjjjo",
+        "oooooooooooooooo",
+        "oZZZZZZZZZZZZZZo",
+        "ozzzzzzzzzzzzzzo",
+        "oooooooooooooooo",
+        ".o.o........o.o.",
+        ".o.o........o.o.",
+    ])
+
+
+def shop_tea():
+    return shop("*", "I", (1, 4), [
+        "zzzzzzzzzzzzzz",
+        "IoIIoIIoIIoIIo",
+        "yyoJJo**oVVoyy",
+        "yyoJJo**oVVoyy",
+        "BBoBBoBBoBBoBB",
+    ])
+
+
+def shop_herbs():
+    return shop("T", "Y", (0, 3), [
+        "TtTtTtTtTtTtTt",
+        "tYtYtYtYtYtYtY",
+        "TTTTTTTTTTTTTT",
+        "oIoo@o&IooIo@o",
+        "TTTTTTTTTTTTTT",
+    ])
+
+
+def chess_table():
+    """A stone xiangqi table with a game going and four stools (Columbus Park)."""
+    return Tile().art([
+        "................",
+        "................",
+        "..oooooooooooo..",
+        ".oZZZZZZZZZZZZo.",
+        ".oZIIzZzZzZRRZo.",
+        ".oZzZzZzZzZzZZo.",
+        ".ozzzzzzzzzzzzo.",
+        ".oZRRzZIIzZzZZo.",
+        ".oZzZzZzZRRzIIo.",
+        ".oZZZZZZZZZZZZo.",
+        "..ozzzzzzzzzzo..",
+        ".oooooZZzooooo..",
+        "oZZo.oZZzo.oZZo.",
+        "ozzo.ooooo.ozzo.",
+        ".oo.........oo..",
+        "................",
+    ])
+
+
+def lamppost_red():
+    return recolor(lamppost(), {"|": "r", "B": "R"})
+
+
+def lamppost_red_top():
+    return recolor(lamppost_top(), {"|": "r", "B": "+", "g": "=", "G": "3", "I": "="})
+
+
 # name -> (builder, solid). Order is the frame index in tiles.png.
 TILES = {
     "wood": (wood, False),
@@ -1475,6 +2587,8 @@ TILES = {
     **{f"uhaul{part.title()}{side}": (lambda part=part, side=side: uhaul(part, side), True)
        for part in ("back", "closed", "body", "cab") for side in "LR"},
     "dumpster": (dumpster, True),
+    "dumpsterL": (lambda: dumpster("L"), True),
+    "dumpsterR": (lambda: dumpster("R"), True),
     "box": (box, False),
     "fireEscape": (fire_escape, True),
     "deck": (deck, False),
@@ -1501,6 +2615,24 @@ TILES = {
     "woodPetals": (wood_petals, False),
     "nightstand": (nightstand, True),
     "menuBoard": (menu_board, True),
+    "rugBlue": (rug_blue, False),
+    "rugCream": (rug_cream, False),
+    "rugRunner": (rug_runner, False),
+    **{f"rugEdge{s}": (lambda s=s: edge(s, "l"), False) for s in "NSEW"},
+    "bathTile": (bath_tile, False),
+    "wallFaceArt": (lambda: wall_art("lake"), True),
+    "wallFaceClock": (lambda: wall_art("clock"), True),
+    "desk": (desk, True),
+    "deskChair": (desk_chair, False),
+    "dresser": (dresser, True),
+    "bookshelf": (bookshelf, True),
+    "floorLamp": (floor_lamp, True),
+    "coffeeTable": (coffee_table, True),
+    "vanity": (vanity, True),
+    "showerN": (lambda: shower("N"), True),
+    "showerS": (lambda: shower("S"), True),
+    "trashCan": (trash_can, True),
+    "coatRack": (coat_rack, True),
     # New York
     "lamppost": (lamppost, True),
     "lamppostTop": (lamppost_top, False),
@@ -1524,6 +2656,27 @@ TILES = {
     "fireEscapeFront": (fire_escape_front, True),
     "fruitStand": (fruit_stand, True),
     "lanterns": (lanterns, False),
+    "lanternsGold": (lanterns_gold, False),
+    "pavers": (pavers, False),
+    **{f"pagoda{p}": (lambda p=p: pagoda(p), True) for p in "LMR"},
+    **{f"gateRoof{p}": (lambda p=p: pagoda(p), False) for p in "LMR"},
+    **{f"gateBeam{p}": (lambda p=p: gate_beam(p), False) for p in ("L", "M", "M2", "M3", "R")},
+    "gatePillar": (gate_pillar, True),
+    "brickSign": (lambda: brick_sign("R", "Y", (2, 5)), True),
+    "brickSign2": (lambda: brick_sign("Y", "R", (3, 1)), True),
+    "brickSign3": (lambda: brick_sign("+", "Y", (4, 0)), True),
+    "brickSign4": (lambda: brick_sign("!", "I", (5, 2)), True),
+    "lionL": (lion, True),
+    "lionR": (lambda: lion().mirror(), True),
+    "phoneBooth": (phone_booth, True),
+    "phoneBoothTop": (lambda: phone_booth(top=True), False),
+    "streetCart": (street_cart, True),
+    "fishStand": (fish_stand, True),
+    "shopTea": (shop_tea, True),
+    "shopHerbs": (shop_herbs, True),
+    "chessTable": (chess_table, True),
+    "lamppostRed": (lamppost_red, True),
+    "lamppostRedTop": (lamppost_red_top, False),
     # Loyola
     "walkway": (walkway, False),
     "foldingChair": (folding_chair, False),
@@ -1558,6 +2711,71 @@ TILES = {
        for name, colors in (("Red", "Rr"), ("Blue", "Cc"), ("White", "Ii"), ("Green", "Vv"))
        for i, half in enumerate("NS")},
     "cone": (cone, True),
+    "alley": (alley, False),
+    **{f"alley{k.title()}": (lambda k=k: alley(k), False) for k in ("crack", "patch", "weeds", "puddle")},
+    "alleyDrain": (alley_drain, False),
+    "alleyGrate": (lambda: alley_drain(grate=True), False),
+    "shinglesN": (lambda: shingles("N"), True),
+    "shinglesS": (lambda: shingles("S"), True),
+    **{f"garage{p}": (lambda p=p: garage(p), True) for p in ("L", "M", "M2", "R")},
+    "fence": (fence, True),
+    "fenceGate": (lambda: fence(gate=True), True),
+    "chainLink": (chain_link, True),
+    **{f"porch{p}": (lambda p=p: porch(p), True) for p in "LMR"},
+    "porchStairs": (porch_stairs, True),
+    "backDoor": (back_door, True),
+    # Decker's Bagels
+    **{f"deckerSign{p}": (lambda i=i: decker_sign()[i], True) for i, p in enumerate("LMR")},
+    **{f"popupWindow{p}": (lambda p=p: popup_window(p), True) for p in "LMR"},
+    "pickupTable": (pickup_table, True),
+    "bagelMenu": (bagel_menu, True),
+    "bikeRack": (bike_rack, True),
+    # Yokocho
+    "woodDark": (wood_dark, False),
+    "slate": (slate, False),
+    "slatWall": (slat_wall, True),
+    "boxSign": (lambda: box_sign((3, 1)), True),
+    "boxSign2": (lambda: box_sign((5, 2)), True),
+    "boxSign3": (lambda: box_sign((0, 4)), True),
+    "sakeShelf": (sake_shelf, True),
+    "noren": (noren, True),
+    "hinokiFront": (lambda: hinoki("front"), True),
+    "hinokiFrontRoll": (lambda: hinoki("front", "handroll"), True),
+    "hinokiFrontSake": (lambda: hinoki("front", "sake"), True),
+    "hinokiFrontCase": (lambda: hinoki("front", "case"), True),
+    "hinokiSando": (lambda: hinoki("front", "sando"), True),
+    "hinokiL": (lambda: hinoki("L"), True),
+    "hinokiLRoll": (lambda: hinoki("L", "handroll"), True),
+    "hinokiR": (lambda: hinoki("R"), True),
+    "hinokiRSake": (lambda: hinoki("R", "sake"), True),
+    "hinokiBL": (lambda: hinoki("BL"), True),
+    "hinokiBR": (lambda: hinoki("BR"), True),
+    "stool": (stool, False),
+    "andon": (andon, True),
+    "prepCounter": (prep_counter, True),
+    # the view from the rooftop, and the DJ
+    **{name: (lambda piece=piece: piece, True) for name, piece in VIEW.items()},
+    "djBoothL": (lambda: dj_booth("L"), True),
+    "djBoothR": (lambda: dj_booth("R"), True),
+    "speaker": (speaker, True),
+    "brickTan": (brick_tan, True),
+    "brickTanWindow": (lambda: brick_tan(window=True), True),
+    "backDoorTan": (lambda: recolor(back_door(), {"M": "j", "m": "J"}), True),
+    "downspout": (downspout, True),
+    "meters": (meters, True),
+    "glassBlock": (glass_block, True),
+    "dryerVent": (dryer_vent, True),
+    "gangway": (gangway, True),
+    "grill": (grill, True),
+    "cartBlue": (lambda: cart("/", "c", "/"), True),
+    "cartBlack": (lambda: cart("B", "|", "B"), True),
+    "pole": (utility_pole, True),
+    "poleTop": (lambda: utility_pole(top=True), False),
+    "wires": (wires, False),
+    "mattressN": (lambda: mattress("N"), True),
+    "mattressS": (lambda: mattress("S"), True),
+    "trashBags": (trash_bags, True),
+    "cat": (cat, True),
     # rooftop
     "skyline2": (lambda: skyline(((0, 5, 4), (6, 8, 9), (9, 13, 2), (14, 15, 7)), ((1, 1), (15, 2)), 1, (11, 0)), True),
     "skyline3": (lambda: skyline(((0, 2, 8), (3, 6, 5), (7, 11, 7), (12, 15, 3)), ((5, 1), (9, 3)), 2), True),
@@ -1577,7 +2795,7 @@ TILES = {
 }
 
 # Drawn above Hannah, so she walks under them.
-OVERHEAD = {"lantern", "lanterns", "bulbs"}
+OVERHEAD = {"lantern", "lanterns", "bulbs", "wires","gateRoofL", "gateRoofM", "gateRoofR", "gateBeamL", "gateBeamM", "gateBeamR"}
 
 # Alternate looks for a tile, picked per cell from its position: name -> [(look, weight)].
 VARIANTS = {
@@ -1586,10 +2804,25 @@ VARIANTS = {
     "water": [("water", 6), ("waterSparkle", 1)],
     "brickWindow": [("brickWindow", 3), ("brickWindowAC", 1), ("brickWindowPlant", 1)],
     "restaurantM": [("restaurantM", 1), ("restaurantM2", 1)],
+    "lanterns": [("lanterns", 3), ("lanternsGold", 1)],
+    "wallFace": [("wallFace", 14), ("wallFaceArt", 2), ("wallFaceClock", 1)],
+    "alley": [("alley", 30), ("alleyCrack", 4), ("alleyPatch", 2), ("alleyWeeds", 3), ("alleyPuddle", 1)],
+    "alleyDrain": [("alleyDrain", 9), ("alleyGrate", 1)],
+    "garageM": [("garageM", 3), ("garageM2", 1)],
+    "boxSign": [("boxSign", 1), ("boxSign2", 1), ("boxSign3", 1)],
+    "hinokiFront": [("hinokiFront", 3), ("hinokiFrontRoll", 2), ("hinokiFrontSake", 1), ("hinokiFrontCase", 2)],
+    "hinokiL": [("hinokiL", 2), ("hinokiLRoll", 1)],
+    "hinokiR": [("hinokiR", 2), ("hinokiRSake", 1)],
+    "gateBeamM": [("gateBeamM", 1), ("gateBeamM2", 1), ("gateBeamM3", 1)],
+    "brickSign": [("brickSign", 1), ("brickSign2", 1), ("brickSign3", 1), ("brickSign4", 1)],
     "car": [("carRed", 3), ("carBlue", 3), ("carWhite", 3), ("carGreen", 1)],
     "skyline": [("skyline", 1), ("skyline2", 1), ("skyline3", 1), ("skyline4", 1)],
     "nightSky": [("nightSky", 1), ("nightSky2", 1), ("nightSky3", 1)],
 }
+
+
+# Tiles per row in tiles.png.
+COLS = 32
 
 
 def js(value):
@@ -1602,7 +2835,11 @@ if __name__ == "__main__":
     for group in (OVERHEAD, *[[look for look, _ in looks] for looks in VARIANTS.values()]):
         for n in group:
             assert n in TILES or f"{n}N" in TILES and f"{n}S" in TILES, f"{n} is not a tile"
-    write_png(os.path.join(root(), "public/sprites/tiles.png"), render(frames, PALETTE, 16, 16))
+    # Laid out in rows of COLS: one very wide strip is too big a texture for some phones.
+    empty = ["." * 16] * 16
+    rows_of = [frames[i:i + COLS] for i in range(0, len(frames), COLS)]
+    rows_of[-1] = rows_of[-1] + [empty] * (COLS - len(rows_of[-1]))
+    write_png(os.path.join(root(), "public/sprites/tiles.png"), [px for part in rows_of for px in render(part, PALETTE, 16, 16)])
     # Preview wraps every 11 tiles so it stays readable.
     bg = (120, 110, 120, 255)
     chunks = [frames[i:i + 11] for i in range(0, len(frames), 11)]
@@ -1616,6 +2853,7 @@ if __name__ == "__main__":
     with open(os.path.join(root(), "src/tileset.js"), "w") as f:
         f.write("// Generated by tools/tiles.py. Do not edit by hand.\n")
         f.write(f"export const TILE_NAMES = {js(names)};\n")
+        f.write(f"export const TILE_COLS = {COLS};\n")
         f.write(f"export const SOLID = new Set({js(solid)});\n")
         f.write(f"export const FULL = new Set({js(full)});\n")
         f.write(f"export const OVERHEAD = new Set({js(sorted(OVERHEAD))});\n")

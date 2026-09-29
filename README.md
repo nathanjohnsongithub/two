@@ -15,7 +15,7 @@ npm run build    # outputs to dist/ (Vercel picks this up automatically)
 Everything personal lives in `src/content.js`:
 
 - **`PROLOGUE`**: the letter shown before chapter 1.
-- **`AREAS`**: one entry per chapter. Each has a text `map` (the legend is at the top of the file), the `notes` hidden in it (map digits `1`-`9` pick which note goes where), optional characters in `npcs`, one-time `details` lines for walking up to a tile, boxes (`x`) to carry into a U-Haul, and an optional `goal`: a tile that, once every note is found (and box loaded), plays its `lines` and photo `cards`, then opens the exit or, with `advance: true`, moves straight on to the next chapter. `player` swaps Hannah's outfit, `night` tints the chapter dark with glowing lights, and `objects` adds map characters just for that chapter (the Chinatown shops, the chapel, the rooftop bar...).
+- **`AREAS`**: one entry per chapter. Each has a text `map` (the legend is at the top of the file), the `notes` hidden in it (map digits `1`-`9` pick which note goes where), optional characters in `npcs` (`at` puts one in a tile instead of on an `N`, like the Decker's worker in her window; `reach` lets one talk from further off, like a chef across the counter), one-time `details` lines for walking up to a tile, boxes (`x`) to carry into a U-Haul, and an optional `goal`: a tile that, once every note is found (and box loaded), plays its `lines` and photo `cards`, then opens the exit or, with `advance: true`, moves straight on to the next chapter. `player` swaps Hannah's outfit, `night` tints the chapter dark with glowing lights (`tint` picks any other color, like Yokocho's dim amber), and `objects` adds map characters just for that chapter (the Chinatown gate and shops, the chapel, the rooftop bar...).
 - **Photos**: put them in `public/photos/` and set `photo: "/photos/name.jpg"` on a note or goal card. Square-ish crops look best.
 - **`ENDING`**: the final letter and the gift reveal.
 
@@ -29,10 +29,11 @@ All pixel art is generated from text grids by small Python scripts (no dependenc
 python3 tools/hannah_sprite.py   # public/sprites/hannah.png + hannah_gown.png (+ tools/hannah_preview.png)
 python3 tools/nathan_sprite.py   # public/sprites/nathan.png
 python3 tools/grad_sprite.py     # public/sprites/grads.png (classmates in chapter 3)
+python3 tools/local_sprite.py    # public/sprites/locals.png (Chinatown locals, the Decker's line and worker, Yokocho's chefs)
 python3 tools/tiles.py           # public/sprites/tiles.png + src/tileset.js (+ tools/tiles_preview.png)
 ```
 
-`tools/tiles.py` also says which tiles hang above Hannah's head (`OVERHEAD`, like the lanterns) and which come in a few looks picked per cell (`VARIANTS`, like grass with flowers or the different skyline towers).
+`tiles.png` is a grid (`COLS` tiles across) so it stays small enough for phones. A picture bigger than one tile, like the skyline view from the rooftop, is drawn whole and cut into `name_row_col` pieces; a block of its character in a map fills in piece by piece. `tools/tiles.py` also says which tiles hang above Hannah's head (`OVERHEAD`, like the lanterns) and which come in a few looks picked per cell (`VARIANTS`, like grass with flowers or the different skyline towers).
 
 ## Code
 

@@ -1,6 +1,6 @@
 import { k } from "./kaplay.js";
 import { AREAS, CONFIG, ENDING, PROLOGUE } from "./content.js";
-import { FULL, OVERHEAD, SOLID, TILE_NAMES, VARIANTS } from "./tileset.js";
+import { FULL, OVERHEAD, SOLID, TILE_COLS, TILE_NAMES, VARIANTS } from "./tileset.js";
 import { COLORS, ui, say, showMemory, hearts, titleCard } from "./ui.js";
 
 const TILE = 16;
@@ -26,7 +26,9 @@ k.loadSprite("hannah", "/sprites/hannah.png", WALK);
 k.loadSprite("hannah_gown", "/sprites/hannah_gown.png", WALK);
 k.loadSprite("nathan", "/sprites/nathan.png");
 k.loadSprite("grads", "/sprites/grads.png", { sliceX: 3 });
-k.loadSprite("tiles", "/sprites/tiles.png", { sliceX: TILE_NAMES.length });
+k.loadSprite("locals", "/sprites/locals.png", { sliceX: 17 });
+// tiles.png is a grid, TILE_COLS tiles across.
+k.loadSprite("tiles", "/sprites/tiles.png", { sliceX: TILE_COLS, sliceY: Math.ceil(TILE_NAMES.length / TILE_COLS) });
 const tileFrame = (name) => TILE_NAMES.indexOf(name);
 const hasTile = (name) => TILE_NAMES.includes(name);
 
@@ -52,9 +54,10 @@ const objectFor = (area, ch) => {
 const BOTTOMS = { wall: "wallFace", window: "windowFace", roof: "roofEave", roofCopper: "roofCopperEave" };
 
 // Trim painted where two surfaces meet: shorelines around water, curbs along
-// the road, the stage's front, the ridge of a roof, and a cornice or gold trim
-// along the tops of buildings.
+// the road, rug borders, the stage's front, the ridge of a roof, and a cornice
+// or gold trim along the tops of buildings.
 const EDGES = [
+  { tile: "rugEdge", on: (s) => s.startsWith("rug"), sides: "NSEW", meets: (s) => !s.startsWith("rug") },
   { tile: "shore", on: (s) => s.startsWith("water"), sides: "NSEW", meets: (s) => !s.startsWith("water") },
   { tile: "curb", on: (s) => s === "sidewalk", sides: "NSEW", meets: (s) => s.startsWith("road") || s === "crosswalk" },
   { tile: "stageSkirt", on: (s) => s === "stage", sides: "S", meets: (s) => s !== "stage" },
@@ -68,6 +71,11 @@ const SIDES = [["N", -1, 0], ["S", 1, 0], ["E", 0, 1], ["W", 0, -1]];
 const GLOWS = {
   bulbs: [[-4, -2, 3.5], [4, -2, 3.5]],
   tableCandle: [[0, -2, 7]],
+  lantern: [[0, 1, 8]],
+  boxSign: [[0, 0, 9]],
+  andon: [[0, -1, 8]],
+  djBoothL: [[2, 6, 7]],
+  djBoothR: [[-2, 6, 7]],
   bistroTable: [[0, -5, 5]],
   heater: [[0, -17, 11]],
 };
@@ -117,6 +125,16 @@ function layout(area) {
         return;
       }
       let object = objectFor(area, ch);
+      // A picture spread over a block of tiles (the skyline view): each cell
+      // takes its piece, `name_row_col`, counted from the block's top left.
+      if (object && hasTile(`${object}_0_0`)) {
+        let top = r;
+        let left = c;
+        while (rows[top - 1]?.[c] === ch) top--;
+        while (row[left - 1] === ch) left--;
+        cells.push((grid[r][c] = { r, c, ch, floor: null, object: `${object}_${r - top}_${c - left}` }));
+        return;
+      }
       // A row of the same piece joins up: beds, the taxi, the restaurant front
       // (which gets its door in the middle).
       let c0 = c;
@@ -196,7 +214,7 @@ k.load(
         return ctx;
       });
       const draw = (ctx, name, r, c) =>
-        ctx.drawImage(img, tileFrame(name) * TILE, 0, TILE, TILE, c * TILE, r * TILE, TILE, TILE);
+        ctx.drawImage(img, (tileFrame(name) % TILE_COLS) * TILE, Math.floor(tileFrame(name) / TILE_COLS) * TILE, TILE, TILE, c * TILE, r * TILE, TILE, TILE);
       for (const cell of layout(area)) {
         const { r, c } = cell;
         // Trim goes on whichever surface it belongs to: the floor, or an object covering it.
@@ -233,8 +251,16 @@ AREAS.forEach((area, a) => {
   const text = area.map.join("");
   const notes = [...text].filter((ch) => /[1-9]/.test(ch)).length;
   if (notes !== area.notes.length) console.warn(`${label} has ${notes} note tiles but ${area.notes.length} notes`);
+  // Characters with `at` stand in the first tile with that character instead of on an N.
   const npcs = [...text].filter((ch) => ch === "N").length;
-  if (npcs !== area.npcs.length) console.warn(`${label} has ${npcs} N tiles but ${area.npcs.length} npcs`);
+  const onN = area.npcs.filter((npc) => !npc.at).length;
+  if (npcs !== onN) console.warn(`${label} has ${npcs} N tiles but ${onN} npcs`);
+  const seats = {};
+  for (const npc of area.npcs) if (npc.at) seats[npc.at] = (seats[npc.at] ?? 0) + 1;
+  for (const [ch, n] of Object.entries(seats)) {
+    const spots = [...text].filter((c) => c === ch).length;
+    if (spots < n) console.warn(`${label} has ${n} people at "${ch}" but only ${spots} "${ch}" tiles`);
+  }
 });
 
 k.scene("title", () => {
@@ -324,8 +350,10 @@ k.scene("area", (index) => {
 
   k.add([k.sprite(`map-${index}`), k.pos(0, 0), k.z(0)]);
   k.add([k.sprite(`map-${index}-above`), k.pos(0, 0), k.z(15)]);
-  // Night chapters get a blue tint over the world (under the HUD and popups).
-  if (area.night) k.add([k.rect(k.width(), k.height()), k.color(11, 16, 48), k.opacity(0.4), k.fixed(), k.z(50)]);
+  // Night chapters get a blue tint over the world (under the HUD and popups);
+  // `tint` sets any other color and strength, e.g. a dim restaurant.
+  const tint = area.tint ?? (area.night ? [11, 16, 48, 0.4] : null);
+  if (tint) k.add([k.rect(k.width(), k.height()), k.color(tint[0], tint[1], tint[2]), k.opacity(tint[3]), k.fixed(), k.z(50)]);
 
   // Walls and solid furniture become a few wide collision boxes (one per run
   // of solid tiles in a row) instead of one per tile.
@@ -344,8 +372,28 @@ k.scene("area", (index) => {
   });
 
   let spawn = k.vec2(mapW / 2, mapH / 2);
-  let npcIdx = 0;
   const npcs = [];
+  const addNpc = (data, center, isGoal) => {
+    const npc = k.add([
+      k.sprite(data.sprite ?? "nathan", { frame: data.frame ?? 0 }),
+      k.pos(center),
+      k.anchor("center"),
+      k.area({ scale: k.vec2(0.6, 0.35), offset: k.vec2(0, 7) }),
+      k.body({ isStatic: true }),
+      k.z(9),
+      // An NPC standing on the goal tile is handled by the goal, not by chatting.
+      { data, near: false, isGoal },
+    ]);
+    // Name tag overhead, for named characters on an N (not for someone in a
+    // window or a seat: it would cover their sign, or crowd the tables).
+    if (data.name && !data.at) {
+      const tag = npc.add([k.rect(data.name.length * 6 + 8, 12, { radius: 3 }), k.pos(0, -20), k.anchor("center"), k.color(COLORS.paper), k.opacity(0.9)]);
+      tag.add([k.text(data.name, { size: 8 }), k.anchor("center"), k.color(COLORS.ink)]);
+    }
+    npcs.push(npc);
+  };
+  const onN = area.npcs.filter((data) => !data.at);
+  let npcIdx = 0;
   const goalSpots = [];
   const details = [];
   const truckBack = [];
@@ -358,13 +406,30 @@ k.scene("area", (index) => {
     if (ch === area.goal?.tile) goalSpots.push(center);
     if (cell.object?.startsWith("uhaulBack")) truckBack.push(cell);
     if (area.details?.[ch]) details.push({ pos: center, lines: area.details[ch], seen: false });
-    if (area.night && GLOWS[cell.object]) {
+    if (tint && GLOWS[cell.object]) {
       // Warm light that shows through the night tint.
+      // A soft halo in two layers (a faint wide one, a brighter core) that flickers a little.
       for (const [x, y, radius] of GLOWS[cell.object]) {
-        const glow = k.add([k.circle(radius), k.pos(center.add(x, y)), k.color(255, 214, 122), k.opacity(0.22), k.z(51)]);
         const phase = k.rand(0, 6);
-        glow.onUpdate(() => { glow.opacity = 0.2 + 0.05 * Math.sin(k.time() * 3 + phase); });
+        for (const [scale, strength] of [[1.7, 0.08], [1, 0.16]]) {
+          const glow = k.add([k.circle(radius * scale), k.pos(center.add(x, y)), k.color(255, 214, 122), k.opacity(strength), k.z(51)]);
+          glow.onUpdate(() => { glow.opacity = strength * (1 + 0.25 * Math.sin(k.time() * 3 + phase)); });
+        }
       }
+    }
+    if (cell.object === "djBoothR") {
+      // Music notes drifting up from the decks.
+      k.loop(0.9, () => {
+        k.add([
+          k.text(k.choose(["♪", "♫"]), { size: 8 }),
+          k.pos(center.add(k.rand(-14, 4), -10)),
+          k.color(k.choose([k.rgb(255, 214, 122), k.rgb(224, 80, 138), k.rgb(143, 194, 171)])),
+          k.opacity(0.9),
+          k.move(k.vec2(k.rand(-0.3, 0.3), -1), 10),
+          k.lifespan(1.6, { fade: 0.8 }),
+          k.z(52),
+        ]);
+      });
     }
     if (cell.object === "stovePot") {
       // A little steam so it looks like someone was just cooking.
@@ -400,21 +465,8 @@ k.scene("area", (index) => {
       ]);
       n.onUpdate(() => { n.pos.y = center.y + Math.sin(k.time() * 3 + c) * 2; });
     } else if (ch === "N") {
-      const data = area.npcs[npcIdx++];
-      if (!data) continue;
-      const npc = k.add([
-        k.sprite(data.sprite ?? "nathan", { frame: data.frame ?? 0 }),
-        k.pos(center),
-        k.anchor("center"),
-        k.area({ scale: k.vec2(0.6, 0.35), offset: k.vec2(0, 7) }),
-        k.body({ isStatic: true }),
-        k.z(9),
-        // An NPC standing on the goal tile is handled by the goal, not by chatting.
-        { data, near: false, isGoal: ch === area.goal?.tile },
-      ]);
-      const tag = npc.add([k.rect(data.name.length * 6 + 8, 12, { radius: 3 }), k.pos(0, -20), k.anchor("center"), k.color(COLORS.paper), k.opacity(0.9)]);
-      tag.add([k.text(data.name, { size: 8 }), k.anchor("center"), k.color(COLORS.ink)]);
-      npcs.push(npc);
+      const data = onN[npcIdx++];
+      if (data) addNpc(data, center, ch === area.goal?.tile);
     } else if (ch === "D") {
       doors.push(k.add([
         k.sprite("tiles", { frame: tileFrame(area.door) }),
@@ -426,6 +478,15 @@ k.scene("area", (index) => {
         { near: true, open: false },
       ]));
     }
+  }
+  // Characters who stand in a tile (someone leaning out of a service window,
+  // people sitting at tables). Several can share a character: each takes the
+  // next tile with it, left to right, top to bottom.
+  const taken = {};
+  for (const data of area.npcs) {
+    if (!data.at) continue;
+    const cell = cells.filter((cell) => cell.ch === data.at)[(taken[data.at] = (taken[data.at] ?? -1) + 1)];
+    if (cell) addNpc(data, cellCenter(cell), false);
   }
 
   const player = k.add([
@@ -568,6 +629,9 @@ k.scene("area", (index) => {
         face(dir);
         const before = player.pos.clone();
         player.move(dir.unit().scale(SPEED));
+        // Streets run off the sides of the map; stop at the edge.
+        player.pos.x = k.clamp(player.pos.x, TILE / 2, mapW - TILE / 2);
+        player.pos.y = k.clamp(player.pos.y, TILE / 2, mapH - TILE / 2);
         // Give up on a tap target if a wall is in the way.
         if (target && !holding) {
           stuck = player.pos.dist(before) < 0.3 ? stuck + 1 : 0;
@@ -599,8 +663,10 @@ k.scene("area", (index) => {
 
     for (const npc of npcs) {
       if (npc.isGoal) continue;
-      const close = player.pos.dist(npc.pos) < 22;
-      if (close && !npc.near) {
+      // `reach` lets someone talk from further off (a chef across the counter).
+      const close = player.pos.dist(npc.pos) < (npc.data.reach ?? 22);
+      // Some people are just there for company and don't say anything.
+      if (close && !npc.near && npc.data.lines?.length) {
         say(allFound() && npc.data.linesAfter ? npc.data.linesAfter : npc.data.lines, npc.data.name);
       }
       npc.near = close;
