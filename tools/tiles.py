@@ -962,9 +962,14 @@ def porch_stairs():
     return t
 
 
-def brick_tan(window=False):
+def brick_tan(window=False, extra=None):
     """Tan brick (plain, or with a window), for a building that isn't red."""
-    return recolor(brick_window() if window else brick(), {"M": "j", "m": "J"})
+    return recolor(brick_window(extra) if window else brick(), {"M": "j", "m": "J"})
+
+
+def brick_green(window=False, extra=None):
+    """Brick painted jade green, like a lot of the older Chinatown buildings."""
+    return recolor(brick_window(extra) if window else brick(), {"M": "(", "m": "%"})
 
 
 def downspout():
@@ -1650,6 +1655,158 @@ def heater(top=False):
 def elevator():
     t = deco_wall().box(2, 2, 13, 15, "$", edge="Y").rect(7, 3, 8, 15, "o")
     return t.rect(3, 3, 12, 4, "Y").px(5, 5, "Y").px(10, 5, "Y")
+
+
+# ---------- Andy's Jazz Club (the ending) ----------
+
+def club_carpet():
+    """Deep red carpet with a thin diamond lattice and gold dots."""
+    t = Tile().fill("0").where(lambda x, y: (x + y) % 8 == 0 or (x - y) % 8 == 0, ")")
+    return t.where(lambda x, y: x % 8 == 4 and y % 8 == 0, "$")
+
+
+def curtain():
+    """Red velvet stage curtain hanging in folds under a gold valance."""
+    t = Tile().fill("R").where(lambda x, y: x % 4 == 0, "r").where(lambda x, y: x % 4 == 2 and y > 3, "!")
+    t.rect(0, 0, 15, 2, "Y").rect(0, 3, 15, 3, "$")
+    return t.where(lambda x, y: y == 4 and x % 4 == 1, "Y")
+
+
+# A tiny neon alphabet for the club's sign (rows of 5, any width).
+NEON = {
+    "A": [".##.", "#..#", "####", "#..#", "#..#"],
+    "N": ["#..#", "##.#", "#.##", "#..#", "#..#"],
+    "D": ["###.", "#..#", "#..#", "#..#", "###."],
+    "Y": ["#.#", "#.#", ".#.", ".#.", ".#."],
+    "'": ["#", "#", ".", ".", "."],
+    "S": [".###", "#...", ".##.", "...#", "###."],
+    "J": ["###", "..#", "..#", "#.#", ".#."],
+    "Z": ["####", "...#", ".##.", "#...", "####"],
+}
+
+
+def neon(t, word, y0, ch):
+    """Write a word centered on a tile in neon letters."""
+    width = sum(len(NEON[c][0]) for c in word) + len(word) - 1
+    x = (t.w - width) // 2
+    for c in word:
+        for dy, row in enumerate(NEON[c]):
+            for dx, p in enumerate(row):
+                if p == "#":
+                    t.px(x + dx, y0 + dy, ch)
+        x += len(NEON[c][0]) + 1
+    return t
+
+
+def andys_sign():
+    """The club's neon sign over the stage, two tiles wide (andysSign_0_0/_0_1)."""
+    t = Tile(32, 16).fill("M").where(lambda x, y: y % 4 == 3, "m")
+    t.box(1, 1, 30, 14, "|")
+    neon(t, "ANDY'S", 3, "!")
+    neon(t, "JAZZ", 9, "3")
+    return {f"andysSign_0_{i}": part for i, part in enumerate(t.split())}
+
+
+def jazz_photo(kind):
+    """A framed black-and-white photo of a jazz great on the brick wall."""
+    t = brick().box(3, 2, 12, 13, "L").rect(4, 3, 11, 12, "z")
+    t.rect(4, 3, 11, 5, "i")
+    # A silhouette: head, shoulders, and a horn.
+    t.circle(7, 6.5, 1.6, "|").rect(5, 9, 9, 12, "|")
+    if kind == "trumpet":
+        t.rect(8, 7, 11, 7, "|").rect(10, 6, 11, 8, "|")
+    else:
+        t.rect(9, 8, 9, 11, "|").rect(9, 11, 11, 11, "|").rect(11, 10, 11, 11, "|")
+    return t
+
+
+def sconce():
+    """A brass wall lamp with a warm shade."""
+    t = brick().rect(7, 9, 8, 12, "$").rect(6, 12, 9, 13, "&")
+    return t.rect(5, 4, 10, 8, "3").rect(6, 3, 9, 3, "3").rect(5, 8, 10, 8, "Y").rect(4, 5, 4, 8, "o").rect(11, 5, 11, 8, "o")
+
+
+def back_bar():
+    """Shelves of bottles behind the bar: whiskey, gin and vermouth."""
+    return recolor(sake_shelf(), {"/": "$", "I": "@"})
+
+
+def club_bar(piece):
+    """The club's long bar: polished wood top with a brass edge, cocktails on top."""
+    return recolor(bar(piece), {"7": "A", "6": "a"})
+
+
+def piano(piece):
+    """A black upright piano against the back of the stage, two tiles wide.
+    Its keys face the pianist, who sits in front of it."""
+    t = Tile(32, 16).rect(1, 0, 30, 13, "|").rect(0, 1, 31, 12, "|")
+    t.rect(1, 0, 30, 0, "o").rect(0, 1, 0, 12, "o").rect(31, 1, 31, 12, "o")
+    t.rect(2, 1, 29, 1, "z")
+    # Sheet music on the stand.
+    t.rect(10, 3, 21, 7, "L").rect(15, 3, 16, 7, "l")
+    for y in (4, 6):
+        t.rect(11, y, 14, y, "z").rect(17, y, 20, y, "z")
+    # The keyboard.
+    t.rect(1, 9, 30, 11, "I").where(lambda x, y: 9 <= y <= 11 and x % 2 == 0 and 1 <= x <= 30, "i")
+    t.where(lambda x, y: 9 <= y <= 10 and x % 4 in (1, 2) and x % 28 not in (1, 2) and 1 <= x <= 30, "|")
+    t.rect(0, 12, 31, 12, "o").rect(2, 13, 3, 15, "o").rect(28, 13, 29, 15, "o")
+    parts = t.split()
+    return parts[0] if piece == "L" else parts[1]
+
+
+def drums():
+    """A drum kit facing the room: cymbals, toms and a bass drum. It's drawn over
+    the drummer (see OVERHEAD), who sits behind it."""
+    t = Tile()
+    # Cymbals on stands.
+    t.rect(0, 3, 4, 4, "Y").rect(1, 2, 3, 2, "Y").rect(2, 5, 2, 12, "z")
+    t.rect(11, 2, 15, 3, "Y").rect(12, 1, 14, 1, "Y").rect(13, 4, 13, 12, "z")
+    # Toms.
+    t.box(3, 6, 6, 9, "R").rect(4, 6, 5, 6, "I")
+    t.box(9, 6, 12, 9, "R").rect(10, 6, 11, 6, "I")
+    # The bass drum with the club's initial on the head.
+    t.circle(7.5, 11.5, 4.4, "o").circle(7.5, 11.5, 3.6, "R").circle(7.5, 11.5, 2.8, "I")
+    t.rect(7, 10, 7, 13, "r").rect(8, 12, 8, 13, "r").px(8, 10, "r").px(9, 11, "r")
+    return t.rect(3, 15, 4, 15, "o").rect(11, 15, 12, 15, "o")
+
+
+def jazz_table(reserved=False):
+    """A little round table with a red candle glass (and a reserved card)."""
+    t = Tile().art([
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "...oooooooooo...",
+        "..oTTTTTTTTTTo..",
+        "..otttttttttto..",
+        "...oooooooooo...",
+        "......o||o......",
+        "......o||o......",
+        "......o||o......",
+        ".....o||||o.....",
+        "....oooooooo....",
+        "................",
+        "................",
+    ])
+    # Candle in a red glass.
+    t.rect(7, 3, 8, 6, "R").rect(7, 3, 8, 3, "!").px(7, 2, "3").px(7, 1, "Y")
+    if reserved:
+        # A folded white card and a rose.
+        t.rect(3, 3, 5, 6, "L").rect(3, 3, 5, 3, "l").px(4, 5, "o")
+        return t.rect(11, 5, 12, 5, "R").px(11, 4, "R").px(12, 6, "v").px(13, 6, "v")
+    # Two cocktails.
+    t.art(["gggg", ".gg.", "..g."], 3, 3)
+    return t.art(["o$o", "o$o", "ooo"], 11, 4)
+
+
+def host_stand():
+    """The host's lectern by the door, with the reservation book and a little lamp."""
+    t = Tile().rect(3, 5, 12, 15, "o").rect(4, 6, 11, 14, "t").rect(4, 9, 11, 9, "T")
+    t.rect(2, 4, 13, 5, "o").rect(3, 4, 12, 4, "T")
+    t.rect(4, 2, 9, 4, "L").rect(6, 2, 7, 4, "l").px(5, 3, "z").px(8, 3, "z")
+    return t.rect(11, 0, 12, 1, "3").rect(11, 2, 11, 3, "$")
 
 
 # ---------- items (not placed in maps) ----------
@@ -2760,6 +2917,10 @@ TILES = {
     "speaker": (speaker, True),
     "brickTan": (brick_tan, True),
     "brickTanWindow": (lambda: brick_tan(window=True), True),
+    "brickTanWindowAC": (lambda: brick_tan(window=True, extra="ac"), True),
+    "brickGreen": (brick_green, True),
+    "brickGreenWindow": (lambda: brick_green(window=True), True),
+    "brickGreenWindowPlant": (lambda: brick_green(window=True, extra="plant"), True),
     "backDoorTan": (lambda: recolor(back_door(), {"M": "j", "m": "J"}), True),
     "downspout": (downspout, True),
     "meters": (meters, True),
@@ -2792,10 +2953,27 @@ TILES = {
     "bistroTable": (bistro_table, True),
     "heater": (heater, True),
     "heaterTop": (lambda: heater(top=True), False),
+    # Andy's Jazz Club
+    "clubCarpet": (club_carpet, False),
+    "curtain": (curtain, True),
+    **{name: (lambda piece=piece: piece, True) for name, piece in andys_sign().items()},
+    "jazzPhoto": (lambda: jazz_photo("trumpet"), True),
+    "jazzPhoto2": (lambda: jazz_photo("sax"), True),
+    "sconce": (sconce, True),
+    "backBar": (back_bar, True),
+    "clubBarL": (lambda: club_bar("L"), True),
+    "clubBarM": (lambda: club_bar("M"), True),
+    "clubBarR": (lambda: club_bar("R"), True),
+    "pianoL": (lambda: piano("L"), True),
+    "pianoR": (lambda: piano("R"), True),
+    "drums": (drums, True),
+    "jazzTable": (jazz_table, True),
+    "reservedTable": (lambda: jazz_table(reserved=True), True),
+    "hostStand": (host_stand, True),
 }
 
 # Drawn above Hannah, so she walks under them.
-OVERHEAD = {"lantern", "lanterns", "bulbs", "wires","gateRoofL", "gateRoofM", "gateRoofR", "gateBeamL", "gateBeamM", "gateBeamR"}
+OVERHEAD = {"lantern", "lanterns", "bulbs", "wires", "drums", "gateRoofL", "gateRoofM", "gateRoofR", "gateBeamL", "gateBeamM", "gateBeamR"}
 
 # Alternate looks for a tile, picked per cell from its position: name -> [(look, weight)].
 VARIANTS = {
@@ -2818,6 +2996,9 @@ VARIANTS = {
     "car": [("carRed", 3), ("carBlue", 3), ("carWhite", 3), ("carGreen", 1)],
     "skyline": [("skyline", 1), ("skyline2", 1), ("skyline3", 1), ("skyline4", 1)],
     "nightSky": [("nightSky", 1), ("nightSky2", 1), ("nightSky3", 1)],
+    "jazzPhoto": [("jazzPhoto", 1), ("jazzPhoto2", 1)],
+    "brickTanWindow": [("brickTanWindow", 3), ("brickTanWindowAC", 1)],
+    "brickGreenWindow": [("brickGreenWindow", 3), ("brickGreenWindowPlant", 1)],
 }
 
 

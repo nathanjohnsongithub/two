@@ -61,6 +61,13 @@ export const AREAS = [
       J: "coffeeTable", V: "vanity", q: "shower", z: "trashCan", y: "coatRack",
     },
     intro: ["February 14th. 1055 W Pratt, apartment 2A.", "Something smells amazing... but where's Nathan?"],
+    // Right after the intro, she catches Nathan slipping away: he walks this
+    // path of [column, row] map tiles (counted from 0), fades out at the end,
+    // and then she says `lines`. `carry` puts a tile over his head.
+    glimpse: {
+      path: [[32, 9], [32, 12], [29, 12], [29, 13]],
+      lines: ["Wait... was that Nathan, sneaking out the back?", "What is he up to?"],
+    },
     map: [
       "##ww##ww###ww#w####www####w###ww#w##",
       "#p.gg...p#RBBjMp#pM.jBBR#tVu#pRjBBM#",
@@ -70,9 +77,9 @@ export const AREAS = [
       "#....''..#.;;;..#...\"\"\".##..#..;;;.#",
       "#.....'..#......#.......##.........#",
       "w......'.####.####.#######..########",
-      "w.i(C).'.....................fccOck#",
-      "#.(:::..'......................\"\"\"c#",
-      "#.C:J:.m.'P##########.###.........c#",
+      "w.i(C).'......''.....''......fccOck#",
+      "#.(:::..''''''.'''''''.''''....\"\"\"c#",
+      "#.C:J:.m..P##########.###..'''....c#",
       "w.):::..y#D#      #tV__q#.........z#",
       "wp..v....#        #_2__q#ccc.......#",
       "##########       ############D##ww##",
@@ -132,7 +139,10 @@ export const AREAS = [
       // The Chinatown gate: a green tile roof (Q) over a signboard (q), on two red pillars (!),
       // with a stone lion on each side (< >).
       Q: "gateRoof", q: "gateBeam", "!": "gatePillar", "<": "lionL", ">": "lionR",
-      // Buildings: fire escapes, vertical signs, green pagoda roofs (^, a row of them joins up).
+      // Buildings: red brick (# plain, I with a window), tan brick (o plain, O window),
+      // brick painted jade green (w plain, W window), fire escapes, vertical signs,
+      // green pagoda roofs (^, a row of them joins up).
+      o: "brickTan", O: "brickTanWindow", w: "brickGreen", W: "brickGreenWindow",
       F: "fireEscapeFront", k: "brickSign", "^": "pagoda",
       // Shops: red, jade, market, roast ducks, bakery, bubble tea, herbs, and the dumpling house.
       R: "shopRed", J: "shopJade", M: "shopMarket", K: "shopDucks", B: "shopBakery", T: "shopTea", H: "shopHerbs",
@@ -144,40 +154,45 @@ export const AREAS = [
       c: "chessTable", t: "table",
     },
     intro: ["Chinatown, New York City.", "Nathan has to be around here somewhere."],
+    // Past the gate, ducking down the alley toward Pell St.
+    glimpse: {
+      path: [[13, 13], [13, 14], [10, 14], [10, 18]],
+      lines: ["Nathan?!", "...Gone around the corner. He's fast when there's food involved."],
+    },
     map: [
-      "#IIkIFFI^^^^^^IIFFIkIII#",
-      "#IIkIFFIIkIIkIIIFFIkIII#",
+      "#I#kFF#w^^^^^^woOOo#IkI#",
+      "#I#kFF#wWwWWwWwoOOo#IkI#",
       "#RKMJTBRMHJBRKJTMBRJKHB#",
       "::g::f::b:::P::::g::f:::",
       ";;;AA;;;;;====;;;;;;;;;;",
       "----------====----------",
       ";;;;;;;;;;====;;;;aa;;;;",
       "::e:::::::::::::::::e:::",
-      "#IIFFIkIQQQQQQQQIkIIFFI#",
-      "#IkFFIIIqqqqqqqqIIIFFkI#",
+      "#OoOFF#kQQQQQQQQI#IwWWw#",
+      "#OoOFF#kqqqqqqqqIkIwWWw#",
       "#RKJMBTR!::::::!HJMKRBT#",
       "::g:N:f:<::::::>::f::g::",
       "iiiiiiiiiiiiiiiiiiiiiiii",
       ":b:::1::::z:::::::::b:::",
       "::::::::::::::::::::::::",
-      "#^^^^^^IkI::IkFF^^^^^^I#",
-      "#IIkIFFIkI::IkFFIIkIIFI#",
-      "#IkIIFFIIk::IIFFkIIIkFI#",
+      "#^^^^^^I#I::IFF#^^^^^^o#",
+      "#wWwwWwIkI::IFF#oOoOoOo#",
+      "#wWwwWwIkI::IFF#oOoOoOo#",
       "#BRHKTJMRB::JKTRMHBRJKT#",
       ":::g:f:::::::::::g::f:::",
       "iiiiiiiiiiiiiiiiiiiiiiii",
-      "::::::b:::::::2:::z:::::",
+      "::::::b:::::::::::z:::::",
       "::::::::::::::::::::::::",
-      "#IkFFI::IIkFF^^^^^^^^^I#",
-      "#IIFFk::IkFFIIIkIIIkIIF#",
-      "#kIFFI::IIFFkIFFIkIFFIF#",
+      "#oOoOo::IkFF#^^^^^^^^^##",
+      "#oOoOo::IkFF#wWwwWwwWwI#",
+      "#oOoOo::I#FF#wWwwWwwWwI#",
       "#MRKBJ::TRHJBVVVVVVVVVK#",
       ":::::::::::::_________::",
       "iiiiiiiiiiiiiiiiiiiiiiii",
       "Y,,,,,Y,,,,Y:_hZh_hth_::",
       ",,cN,,,,,c,,:_________::",
       ",,,,,,,,,,,,:_hth_hth_::",
-      "Y,,,,3,,,,,Y:_________::",
+      "Y,,,,,,,,,,Y:_________::",
       ",,c,,,,,,c,,::::::::::::",
       ",,,,,,,,,,,,:e::::::::e:",
       "Y,,nn,,nn,,Y::::::D:::::",
@@ -185,19 +200,22 @@ export const AREAS = [
     ],
     notes: [
       { title: "Chinatown", caption: "We kept finding our way back here.", photo: null },
-      { title: "Every window", caption: "Roast ducks, egg tarts, bubble tea. We wanted to try all of it.", photo: null },
-      { title: "Dumplings", caption: "A plate of fried dumplings, to share. That was the plan, anyway.", photo: null },
     ],
-    // The auntie at the fruit stand and the uncle at the xiangqi tables (tools/local_sprite.py).
+    // The auntie at the fruit stand and the uncle at the xiangqi tables
+    // (tools/local_sprite.py). She has to talk to both before the dumpling plate.
     npcs: [
       {
         name: "Auntie",
+        required: true,
+        hint: "the auntie at the fruit stand",
         sprite: "locals",
         frame: 0,
         lines: ["Looking for your boyfriend? Very hungry boy?", "He asked me where to get the best dumplings. I sent him down the street."],
       },
       {
         name: "Uncle",
+        required: true,
+        hint: "the uncle at the xiangqi tables",
         sprite: "locals",
         frame: 1,
         lines: ["Shh. I'm about to win.", "...Your boyfriend? He watched one game, then followed his nose to the dumpling house."],
@@ -206,6 +224,9 @@ export const AREAS = [
     goal: {
       tile: "Z",
       locked: ["A plate with nothing but crumbs on it. Better look around first."],
+      // Shown once the note is found but she hasn't talked to the auntie and the
+      // uncle yet. {who} becomes whoever's left.
+      lockedTalk: ["A plate with nothing but crumbs on it.", "Someone around here must have seen him. Maybe {who}?"],
       lines: [
         "An empty plate. Just crumbs and a pair of chopsticks.",
         "There's a note tucked under it:",
@@ -265,7 +286,7 @@ export const AREAS = [
       "H.hhhGhh,,..Y.....,~~~",
       "H.......,,e.......,~~~",
       "H.hhhhhh,,........,~~~",
-      "H.......,,...3.Y..,~~~",
+      "H.......,,.....Y..,~~~",
       "H.......,,........,~~~",
       "H.......,,........,~~~",
       "##W#W####D###W#W#W#~~~",
@@ -274,24 +295,30 @@ export const AREAS = [
     notes: [
       { title: "We did it", caption: "Two Loyola graduates. I'm so proud of you.", photo: null },
       { title: "The lake", caption: "Of all the campuses in Chicago, ours had Lake Michigan right there.", photo: null },
-      { title: "Four years", caption: "Four years of classes, and somehow the best part was you.", photo: null },
     ],
     // Classmates in cap and gown (frame picks the look in tools/grad_sprite.py).
+    // She has to talk to all three before the cap on the chair.
     npcs: [
       {
-        name: "Classmate",
+        name: "Krisjanis",
+        required: true,
+        hint: "Krisjanis by the main hall",
         sprite: "grads",
         frame: 0,
         lines: ["Congrats, Hannah! Nathan? I think I saw him heading toward the chapel."],
       },
       {
-        name: "Classmate",
+        name: "Lexi",
+        required: true,
+        hint: "Lexi outside the chapel",
         sprite: "grads",
         frame: 1,
         lines: ["Nathan? You JUST missed him!", "He said something about the ceremony chairs?"],
       },
       {
-        name: "Classmate",
+        name: "Micheal",
+        required: true,
+        hint: "Micheal down by the lake",
         sprite: "grads",
         frame: 2,
         lines: ["Everyone's wearing the same gown. Good luck finding anyone in this crowd."],
@@ -300,6 +327,8 @@ export const AREAS = [
     goal: {
       tile: "G",
       locked: ["A graduation cap left on a chair... Look around first."],
+      // Once the notes are found, but not everyone's been talked to. {who} is whoever's left.
+      lockedTalk: ["A graduation cap left on a chair...", "Maybe one of your classmates saw where he went. Try {who}."],
       lines: [
         "A graduation cap, left on a chair. The tassel's already turned.",
         "There's a note tucked inside:",
@@ -334,6 +363,12 @@ export const AREAS = [
       e: "pole", w: "wires", A: "car", i: "cone",
     },
     intro: ["Moving day. Goodbye, Rogers Park.", "Carry every box to the U-Haul."],
+    // Off down the alley with one box, leaving her the rest.
+    glimpse: {
+      path: [[18, 6], [18, 7], [39, 7]],
+      carry: "box",
+      lines: ["Was that Nathan, carrying ONE box?", "...Guess the rest are up to me."],
+    },
     details: {
       k: ["A stray cat. It watches you carry boxes.", "It does not offer to help."],
     },
@@ -380,6 +415,11 @@ export const AREAS = [
       X: "pickupTable", m: "bagelMenu", k: "bikeRack", F: "fireEscapeFront", A: "taxi", a: "taxiEast",
     },
     intro: ["The last date before your new job.", "First stop: Decker's Bagels."],
+    // Leaving the pickup table, grinning.
+    glimpse: {
+      path: [[10, 5], [13, 5], [13, 6], [15, 6]],
+      lines: ["Hold on... was that Nathan, grinning about something?", "Gone again."],
+    },
     map: [
       "##II###II###II##",
       "##II###II###II##",
@@ -583,21 +623,105 @@ export const AREAS = [
         "Sorry for making you chase me through our whole year.",
         "Every note was leading you here.",
         "Happy anniversary, Hannah.",
+        "But I have one more gift for you.",
+        "This one isn't a memory yet. It's for the future.",
+        "Come on. I'll show you.",
       ],
       cards: [],
       end: [],
       advance: true,
+      // Fade to black on the way to the jazz club.
+      fade: true,
+    },
+  },
+  {
+    // The last gift: a night out that hasn't happened yet.
+    chapter: "Someday soon",
+    name: "Andy's Jazz Club",
+    background: "#1a1420",
+    tint: [30, 10, 14, 0.45],
+    wall: "brick",
+    // Nathan walks in with her this time, a step behind.
+    companion: { sprite: "nathan" },
+    // "," is the stage, "_" the floor behind the bar. The band and the
+    // bartender stand in their own tiles: "i" the pianist's bench, "v" the
+    // singer and the sax player, "q" the drum kit, "m" behind the bar.
+    floors: { ".": "clubCarpet", ",": "stage", _: "woodDark", a: "clubCarpet", b: "clubCarpet", m: "woodDark", i: "stage", v: "stage" },
+    // Characters for this chapter only: the back bar (K) and the bar (c) with
+    // stools, the curtain behind the stage, the neon sign (A, two wide), jazz
+    // photos and wall lamps, the piano (two wide) and drums, candlelit
+    // tables, your reserved table (Y), the host stand, plants and the door.
+    objects: {
+      K: "backBar", c: "clubBar", o: "stool", C: "curtain", A: "andysSign", F: "jazzPhoto", J: "sconce",
+      p: "piano", q: "drums", T: "jazzTable", Y: "reservedTable", h: "hostStand", g: "plant", E: "door",
+    },
+    intro: ["Andy's Jazz Club, downtown.", "The band's already playing."],
+    map: [
+      "#KKKKFCCAACCJFJ#",
+      "#_m__.,pp,q,...#",
+      "#cccc.,i,v,v,..#",
+      "#oooo..........#",
+      "#.......Y......#",
+      "#.aTb.......aTb#",
+      "#g.............#",
+      "#.aTb..aTb.....#",
+      "#.............g#",
+      "#.aTb.......N..#",
+      "#...........h..#",
+      "#..........P..g#",
+      "###########E####",
+    ],
+    notes: [],
+    npcs: [
+      {
+        name: "Host",
+        sprite: "locals",
+        frame: 21,
+        reach: 40,
+        lines: ["Welcome to Andy's!", "Reservation for two? Right this way.", "Your table's up front, right by the stage."],
+      },
+      // The band. They're busy playing, except the singer.
+      { at: "i", sprite: "locals", frame: 17, sway: true, lines: [] },
+      { at: "q", sprite: "locals", frame: 18, sway: true, lines: [] },
+      { name: "Singer", at: "v", sprite: "locals", frame: 19, sway: true, reach: 30, lines: ["Welcome in, you two.", "This next one's a slow one."] },
+      { at: "v", sprite: "locals", frame: 20, sway: true, lines: [] },
+      { name: "Bartender", at: "m", sprite: "locals", frame: 15, reach: 34, lines: ["What can I get you two?", "Grab your table first. The set's already started."] },
+      // Guests at the tables, in map order: frames 7-10 face right (seats "a"),
+      // 11-14 face left (seats "b").
+      { at: "a", sprite: "locals", frame: 8, lines: ["First time at Andy's? You're in for a treat."] },
+      { at: "a", sprite: "locals", frame: 9, lines: [] },
+      { at: "a", sprite: "locals", frame: 10, lines: [] },
+      { at: "b", sprite: "locals", frame: 11, lines: ["Shh... the sax solo's coming up."] },
+      { at: "b", sprite: "locals", frame: 13, lines: [] },
+      { at: "b", sprite: "locals", frame: 14, lines: ["You two look like you're celebrating."] },
+    ],
+    // The goal is the reserved table: they sit down across from each other,
+    // and he gives her the tickets.
+    goal: {
+      tile: "Y",
+      meet: true,
+      speaker: "Nathan",
+      locked: [],
+      lines: ["Front row, right by the band.", "So... about that one more gift."],
+      ticket: {
+        label: "ONE MORE GIFT",
+        admit: "ADMIT TWO",
+        venue: "Andy's Jazz Club",
+        detail: "Live jazz · Downtown Chicago",
+        // TODO: the real date and time of the show.
+        date: "DATE · TIME",
+        stub: "Seat: next to me",
+        caption: "A real night out, just the two of us. It's a date.",
+      },
+      end: ["I can't wait.", "Here's to year three, Hannah."],
+      endSpeaker: "Nathan",
+      advance: true,
+      fade: true,
     },
   },
 ];
 
 export const ENDING = {
-  letter: [
-    "Two years.",
-    "Write your letter here, one line per tap.",
-    "Keep each line short so it fits on a phone screen.",
-  ],
-  giftIntro: "Your real present is...",
-  gift: "Placeholder gift reveal",
-  signoff: "Happy anniversary. ♥",
+  signoff: "Happy anniversary, Hannah. ♥",
+  closing: "Love, Nathan",
 };

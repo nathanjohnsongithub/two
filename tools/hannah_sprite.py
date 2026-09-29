@@ -103,13 +103,13 @@ SIDE = [
     "...oHHHHHoSSo...",
     "...oHHHHHoSo....",
     "...oHHHHTTTo....",
-    "...oHHHTTTTTo...",
-    "...oHHTTTsTTo...",
-    "...otTTTTsTTo...",
-    "...oJJJJJSJo....",
-    "...oJJJJJJJo....",
-    "...oJJJJjJJo....",
-    "...oJJJJJJJo....",
+    "...oHHHTTTTo....",
+    "...oHHTTsTTo....",
+    "....ootTsTTo....",
+    ".....oJJSJJo....",
+    ".....oJJJJJo....",
+    ".....oJJjJJo....",
+    ".....oJJJJJo....",
 ]
 
 # Legs are the bottom 4 rows, swapped out per animation frame.
@@ -131,24 +131,25 @@ LEGS_FRONT = {
     "b": [r[::-1] for r in WALK_A_FRONT],
 }
 
+# Slim from the side: legs two pixels wide each, and a shorter stride.
 LEGS_SIDE = {
     "idle": [
-        "....oJJJJJJo....",
-        "....ojJJJJJo....",
-        "....oJJJJJJo....",
-        "....oFFFFFFFo...",
+        ".....oJJJJJo....",
+        ".....ojJJJJo....",
+        ".....oJJJJJo....",
+        ".....oFFFFFFo...",
     ],
     "a": [
-        "....oJJJoJJJo...",
-        "...oJJJo.oJJJo..",
-        "...oJJJo.oJJJo..",
-        "..oFFFo...oFFFo.",
+        ".....oJJoJJo....",
+        "....oJJo.oJJo...",
+        "....oJJo.oJJo...",
+        "...oFFFo.oFFFo..",
     ],
     "b": [
         ".....oJJJJJo....",
-        "....oJJJoJJJo...",
-        "....oJJJoJJJo...",
-        "...oFFFo.oFFFo..",
+        ".....oJJoJJo....",
+        ".....oJJoJJo....",
+        "....oFFoFFFo....",
     ],
 }
 

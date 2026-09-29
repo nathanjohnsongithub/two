@@ -1,12 +1,15 @@
 import { k } from "./kaplay.js";
 import { AREAS, CONFIG, ENDING, PROLOGUE } from "./content.js";
 import { FULL, OVERHEAD, SOLID, TILE_COLS, TILE_NAMES, VARIANTS } from "./tileset.js";
-import { COLORS, ui, say, showMemory, hearts, titleCard } from "./ui.js";
+import { COLORS, ui, say, showMemory, showTicket, hearts, titleCard, fadeOut } from "./ui.js";
+import { loadProgress, saveProgress } from "./save.js";
 
 const TILE = 16;
 const SPEED = 90;
 // World zoom. At 2x the 320x480 screen shows 10x15 tiles, which reads well on a phone.
 const ZOOM = 2;
+// Snapping the camera to whole screen pixels keeps the pixel art from shimmering.
+const snap = (v) => Math.round(v * ZOOM) / ZOOM;
 
 // 16x24 frames, see tools/hannah_sprite.py for the layout.
 const WALK = {
@@ -22,11 +25,12 @@ const WALK = {
     "left-walk": { frames: [10, 9, 11, 9], loop: true, speed: 10 },
   },
 };
+k.loadFont("pixel", "/fonts/Jersey10.ttf", { size: 10 });
 k.loadSprite("hannah", "/sprites/hannah.png", WALK);
 k.loadSprite("hannah_gown", "/sprites/hannah_gown.png", WALK);
-k.loadSprite("nathan", "/sprites/nathan.png");
+k.loadSprite("nathan", "/sprites/nathan.png", WALK);
 k.loadSprite("grads", "/sprites/grads.png", { sliceX: 3 });
-k.loadSprite("locals", "/sprites/locals.png", { sliceX: 17 });
+k.loadSprite("locals", "/sprites/locals.png", { sliceX: 22 });
 // tiles.png is a grid, TILE_COLS tiles across.
 k.loadSprite("tiles", "/sprites/tiles.png", { sliceX: TILE_COLS, sliceY: Math.ceil(TILE_NAMES.length / TILE_COLS) });
 const tileFrame = (name) => TILE_NAMES.indexOf(name);
@@ -78,7 +82,37 @@ const GLOWS = {
   djBoothR: [[-2, 6, 7]],
   bistroTable: [[0, -5, 5]],
   heater: [[0, -17, 11]],
+  jazzTable: [[0, -4, 6]],
+  reservedTable: [[0, -4, 6]],
+  sconce: [[0, -2, 9]],
 };
+
+// Warm light that shows through a night tint, around a tile's center: a soft
+// halo in two layers (a faint wide one, a brighter core) that flickers a little.
+function addGlows(object, center) {
+  for (const [x, y, radius] of GLOWS[object] ?? []) {
+    const phase = k.rand(0, 6);
+    for (const [scale, strength] of [[1.7, 0.08], [1, 0.16]]) {
+      const glow = k.add([k.circle(radius * scale), k.pos(center.add(x, y)), k.color(255, 214, 122), k.opacity(strength), k.z(51)]);
+      glow.onUpdate(() => { glow.opacity = strength * (1 + 0.25 * Math.sin(k.time() * 3 + phase)); });
+    }
+  }
+}
+
+// Where music notes drift up from: the DJ's decks, and the band at Andy's.
+const MUSIC = new Set(["djBoothR", "drums", "pianoR"]);
+
+// Which way someone walking in `dir` faces. Only turn to a new axis when
+// clearly heading that way: walking at a diagonal otherwise flips between two
+// directions every frame, which keeps restarting the walk animation and makes
+// it look stuck.
+function turn(facing, dir) {
+  const ax = Math.abs(dir.x);
+  const ay = Math.abs(dir.y);
+  const horizontal = facing === "left" || facing === "right";
+  const useX = horizontal ? !(ay > ax * 1.3) : ax > ay * 1.3;
+  return useX ? (dir.x > 0 ? "right" : "left") : dir.y > 0 ? "down" : "up";
+}
 
 // Some tiles come in a few looks (grass with flowers, different trees...).
 // The look is picked from the cell's position, so a map looks the same every time.
@@ -202,32 +236,52 @@ const tilesImage = new Promise((resolve, reject) => {
   img.onerror = reject;
   img.src = "/sprites/tiles.png";
 });
+function bake(img, area, name) {
+  const [ground, above] = [0, 1].map(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = area.map[0].length * TILE;
+    canvas.height = area.map.length * TILE;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    return ctx;
+  });
+  const draw = (ctx, tile, r, c) =>
+    ctx.drawImage(img, (tileFrame(tile) % TILE_COLS) * TILE, Math.floor(tileFrame(tile) / TILE_COLS) * TILE, TILE, TILE, c * TILE, r * TILE, TILE, TILE);
+  for (const cell of layout(area)) {
+    const { r, c } = cell;
+    // Trim goes on whichever surface it belongs to: the floor, or an object covering it.
+    const trimFloor = !cell.object || !FULL.has(cell.object);
+    if (cell.floor) draw(ground, cell.floorLook, r, c);
+    if (trimFloor) cell.edges.forEach((edge) => draw(ground, edge, r, c));
+    if (cell.object) draw(OVERHEAD.has(cell.object) ? above : ground, cell.objectLook, r, c);
+    if (!trimFloor) cell.edges.forEach((edge) => draw(ground, edge, r, c));
+    if (cell.top) draw(above, cell.top, r - 1, c);
+  }
+  k.loadSprite(name, ground.canvas);
+  k.loadSprite(`${name}-above`, above.canvas);
+}
+
+// The title screen is a little scene of its own: the two of them at the
+// railing of the rooftop from chapter 5, looking out at the skyline.
+const ROOFTOP = {
+  floors: { ".": "deck" },
+  objects: { V: "view", T: "bistroTable" },
+  map: [
+    "VVVVVVVVVVVVVV",
+    "VVVVVVVVVVVVVV",
+    "VVVVVVVVVVVVVV",
+    "VVVVVVVVVVVVVV",
+    "rrrrrrrrrrrrrr",
+    "..............",
+    "oooooooooooooo",
+    "p..T......T..p",
+  ],
+};
+
 k.load(
   tilesImage.then((img) => {
-    AREAS.forEach((area, i) => {
-      const [ground, above] = [0, 1].map(() => {
-        const canvas = document.createElement("canvas");
-        canvas.width = area.map[0].length * TILE;
-        canvas.height = area.map.length * TILE;
-        const ctx = canvas.getContext("2d");
-        ctx.imageSmoothingEnabled = false;
-        return ctx;
-      });
-      const draw = (ctx, name, r, c) =>
-        ctx.drawImage(img, (tileFrame(name) % TILE_COLS) * TILE, Math.floor(tileFrame(name) / TILE_COLS) * TILE, TILE, TILE, c * TILE, r * TILE, TILE, TILE);
-      for (const cell of layout(area)) {
-        const { r, c } = cell;
-        // Trim goes on whichever surface it belongs to: the floor, or an object covering it.
-        const trimFloor = !cell.object || !FULL.has(cell.object);
-        if (cell.floor) draw(ground, cell.floorLook, r, c);
-        if (trimFloor) cell.edges.forEach((edge) => draw(ground, edge, r, c));
-        if (cell.object) draw(OVERHEAD.has(cell.object) ? above : ground, cell.objectLook, r, c);
-        if (!trimFloor) cell.edges.forEach((edge) => draw(ground, edge, r, c));
-        if (cell.top) draw(above, cell.top, r - 1, c);
-      }
-      k.loadSprite(`map-${i}`, ground.canvas);
-      k.loadSprite(`map-${i}-above`, above.canvas);
-    });
+    AREAS.forEach((area, i) => bake(img, area, `map-${i}`));
+    bake(img, ROOFTOP, "map-title");
   }),
 );
 
@@ -263,39 +317,112 @@ AREAS.forEach((area, a) => {
   }
 });
 
-k.scene("title", () => {
-  k.setBackground(COLORS.ink);
-  // The two of them, with a heart floating over their heads.
-  const couple = k.vec2(k.width() / 2, k.height() / 2 - 130);
-  k.add([k.sprite("hannah", { frame: 0 }), k.pos(couple.add(-26, 0)), k.anchor("center"), k.scale(3)]);
-  k.add([k.sprite("nathan"), k.pos(couple.add(26, 0)), k.anchor("center"), k.scale(3)]);
-  const heart = k.add([k.text("♥", { size: 20 }), k.pos(couple.add(0, -52)), k.anchor("center"), k.color(COLORS.accent)]);
-  heart.onUpdate(() => { heart.pos.y = couple.y - 52 + Math.sin(k.time() * 2) * 3; });
-  k.add([
-    k.text(CONFIG.title, { size: 36 }),
-    k.pos(k.width() / 2, k.height() / 2 - 40),
+// A button on a screen with no world behind it (the title, the chapter list).
+function button(label, pos, onPick, { primary = false, width = 180 } = {}) {
+  const b = k.add([
+    k.rect(width, 30, { radius: 4 }),
+    k.pos(pos),
     k.anchor("center"),
-    k.color(COLORS.paper),
+    k.color(primary ? COLORS.paper : COLORS.ink),
+    k.outline(2, primary ? COLORS.ink : COLORS.muted),
+    k.area(),
+    k.fixed(),
+    k.z(100),
   ]);
-  k.add([
-    k.text(CONFIG.subtitle, { size: 14 }),
-    k.pos(k.width() / 2, k.height() / 2),
-    k.anchor("center"),
-    k.color(COLORS.accent),
-  ]);
-  const prompt = k.add([
-    k.text("tap to start", { size: 11 }),
-    k.pos(k.width() / 2, k.height() / 2 + 80),
-    k.anchor("center"),
-    k.color(COLORS.muted),
-    k.opacity(1),
-  ]);
-  prompt.onUpdate(() => { prompt.opacity = 0.5 + 0.5 * Math.sin(k.time() * 3); });
-  k.loop(0.5, () => hearts(k.vec2(k.rand(20, k.width() - 20), k.height() - 20), 1));
+  b.add([k.text(label, { size: 20 }), k.pos(0, 1), k.anchor("center"), k.color(primary ? COLORS.ink : COLORS.paper)]);
+  b.onClick(onPick);
+  return b;
+}
 
-  const start = () => k.go("prologue");
-  k.onMousePress(start);
-  k.onKeyPress(["space", "enter"], start);
+k.scene("title", () => {
+  const sky = k.Color.fromHex("#1b2340");
+  k.setBackground(sky);
+  k.setCamScale(ZOOM);
+  const W = ROOFTOP.map[0].length * TILE;
+  const H = ROOFTOP.map.length * TILE;
+  // The rooftop fills the bottom of the screen; the sky above it holds the title.
+  const camY = H - k.height() / ZOOM / 2;
+  k.add([k.sprite("map-title"), k.pos(0, 0), k.z(0)]);
+  k.add([k.sprite("map-title-above"), k.pos(0, 0), k.z(15)]);
+  for (let i = 0; i < 30; i++) {
+    const star = k.add([
+      k.rect(1, 1),
+      k.pos(Math.floor(k.rand(0, W)), Math.floor(k.rand(-110, -2))),
+      k.color(k.choose([k.rgb(255, 250, 244), k.rgb(247, 214, 122)])),
+      k.opacity(1),
+      k.z(1),
+    ]);
+    const [phase, speed] = [k.rand(0, 6), k.rand(1, 3)];
+    star.onUpdate(() => { star.opacity = 0.55 + 0.45 * Math.sin(k.time() * speed + phase); });
+  }
+  // The two of them at the railing, looking out at the city.
+  const x = W / 2;
+  const y = 5 * TILE + TILE / 2;
+  k.add([k.sprite("hannah", { anim: "up-idle" }), k.pos(x - 7, y), k.anchor("center"), k.z(10)]);
+  k.add([k.sprite("nathan", { anim: "up-idle" }), k.pos(x + 8, y - 1), k.anchor("center"), k.z(10)]);
+  k.loop(1.4, () => hearts(k.toScreen(k.vec2(x, y - 14)), 1, true, 52));
+  // Night, with the string lights and candles glowing.
+  k.add([k.rect(k.width(), k.height()), k.color(11, 16, 48), k.opacity(0.4), k.fixed(), k.z(50)]);
+  for (const cell of layout(ROOFTOP)) addGlows(cell.object, k.vec2(cell.c * TILE + TILE / 2, cell.r * TILE + TILE / 2));
+  // Drift slowly along the skyline and back.
+  const drift = (W - k.width() / ZOOM) / 2;
+  const pan = () => k.setCamPos(snap(W / 2 + drift * Math.sin(k.time() * 0.15)), camY);
+  pan();
+  k.onUpdate(pan);
+
+  k.add([k.text(CONFIG.title, { size: 40 }), k.pos(k.width() / 2, 64), k.anchor("center"), k.color(COLORS.paper), k.fixed(), k.z(100)]);
+  k.add([k.text(CONFIG.subtitle, { size: 20 }), k.pos(k.width() / 2, 100), k.anchor("center"), k.color(COLORS.accent), k.fixed(), k.z(100)]);
+
+  // First time: tap anywhere. After that, pick up where she left off, or
+  // (once she's seen the ending) play again or jump to any chapter.
+  const progress = loadProgress();
+  const saved = AREAS[progress.chapter] ? progress.chapter : null;
+  let primary = null;
+  if (progress.done) {
+    primary = () => k.go("prologue");
+    button("Play again", k.vec2(k.width() / 2, 148), primary, { primary: true });
+    button("Chapters", k.vec2(k.width() / 2, 186), () => k.go("chapters"));
+  } else if (saved !== null) {
+    primary = () => k.go("area", saved);
+    button("Continue", k.vec2(k.width() / 2, 136), primary, { primary: true });
+    k.add([k.text(AREAS[saved].chapter, { size: 20 }), k.pos(k.width() / 2, 164), k.anchor("center"), k.color(COLORS.muted), k.fixed(), k.z(100)]);
+    button("Start over", k.vec2(k.width() / 2, 196), () => k.go("prologue"));
+  } else {
+    primary = () => k.go("prologue");
+    const prompt = k.add([
+      k.text("tap to start", { size: 20 }),
+      k.pos(k.width() / 2, 160),
+      k.anchor("center"),
+      k.color(COLORS.paper),
+      k.opacity(1),
+      k.fixed(),
+      k.z(100),
+    ]);
+    prompt.onUpdate(() => { prompt.opacity = 0.7 + 0.3 * Math.sin(k.time() * 3); });
+    k.onMousePress(primary);
+  }
+  k.onKeyPress(["space", "enter"], primary);
+});
+
+// Once she's finished, any chapter can be replayed from the title screen.
+k.scene("chapters", () => {
+  k.setBackground(COLORS.ink);
+  k.add([k.text("Chapters", { size: 30 }), k.pos(k.width() / 2, 34), k.anchor("center"), k.color(COLORS.paper)]);
+  AREAS.forEach((area, i) => {
+    const row = k.add([
+      k.rect(k.width() - 40, 38, { radius: 4 }),
+      k.pos(20, 62 + i * 44),
+      k.color(COLORS.paper),
+      k.opacity(0.08),
+      k.outline(1, COLORS.muted),
+      k.area(),
+    ]);
+    row.add([k.text(area.chapter, { size: 10 }), k.pos(10, 5), k.color(COLORS.accent)]);
+    row.add([k.text(area.name, { size: 20 }), k.pos(10, 15), k.color(COLORS.paper)]);
+    row.onClick(() => k.go("area", i));
+  });
+  button("Back", k.vec2(k.width() / 2, k.height() - 26), () => k.go("title"), { width: 120 });
+  k.onKeyPress("escape", () => k.go("title"));
 });
 
 // A handwritten-style letter that fills in one line per tap.
@@ -317,17 +444,17 @@ k.scene("prologue", () => {
       return;
     }
     const line = card.add([
-      k.text(PROLOGUE[shown], { size: 13, width: W - 40, lineSpacing: 4 }),
+      k.text(PROLOGUE[shown], { size: 20, width: W - 40, lineSpacing: 2 }),
       k.pos(-W / 2 + 20, y),
       k.color(COLORS.ink),
       k.opacity(0),
     ]);
     k.tween(0, 1, 0.6, (v) => { line.opacity = v; });
-    y += line.height + 16;
+    y += line.height + 12;
     shown++;
   };
   k.add([
-    k.text("tap", { size: 9 }),
+    k.text("tap", { size: 10 }),
     k.pos(k.width() / 2, k.height() - 36),
     k.anchor("center"),
     k.color(COLORS.muted),
@@ -339,6 +466,7 @@ k.scene("prologue", () => {
 
 k.scene("area", (index) => {
   const area = AREAS[index];
+  saveProgress({ chapter: index });
   k.setBackground(k.Color.fromHex(area.background ?? "#1a1420"));
   k.setCamScale(ZOOM);
 
@@ -384,11 +512,18 @@ k.scene("area", (index) => {
       // An NPC standing on the goal tile is handled by the goal, not by chatting.
       { data, near: false, isGoal },
     ]);
+    // Musicians bob along to the music.
+    if (data.sway) {
+      const phase = k.rand(0, 6);
+      npc.onUpdate(() => { npc.pos.y = center.y + Math.round(Math.sin(k.time() * 5 + phase)); });
+    }
     // Name tag overhead, for named characters on an N (not for someone in a
     // window or a seat: it would cover their sign, or crowd the tables).
     if (data.name && !data.at) {
-      const tag = npc.add([k.rect(data.name.length * 6 + 8, 12, { radius: 3 }), k.pos(0, -20), k.anchor("center"), k.color(COLORS.paper), k.opacity(0.9)]);
-      tag.add([k.text(data.name, { size: 8 }), k.anchor("center"), k.color(COLORS.ink)]);
+      // Size 10 in the world is 20 on screen at 2x zoom.
+      const name = k.make([k.text(data.name, { size: 10 }), k.pos(0, 0.5), k.anchor("center"), k.color(COLORS.ink)]);
+      const tag = npc.add([k.rect(Math.ceil(name.width) + 6, 11, { radius: 3 }), k.pos(0, -20), k.anchor("center"), k.color(COLORS.paper), k.opacity(0.9)]);
+      tag.add(name);
     }
     npcs.push(npc);
   };
@@ -406,22 +541,12 @@ k.scene("area", (index) => {
     if (ch === area.goal?.tile) goalSpots.push(center);
     if (cell.object?.startsWith("uhaulBack")) truckBack.push(cell);
     if (area.details?.[ch]) details.push({ pos: center, lines: area.details[ch], seen: false });
-    if (tint && GLOWS[cell.object]) {
-      // Warm light that shows through the night tint.
-      // A soft halo in two layers (a faint wide one, a brighter core) that flickers a little.
-      for (const [x, y, radius] of GLOWS[cell.object]) {
-        const phase = k.rand(0, 6);
-        for (const [scale, strength] of [[1.7, 0.08], [1, 0.16]]) {
-          const glow = k.add([k.circle(radius * scale), k.pos(center.add(x, y)), k.color(255, 214, 122), k.opacity(strength), k.z(51)]);
-          glow.onUpdate(() => { glow.opacity = strength * (1 + 0.25 * Math.sin(k.time() * 3 + phase)); });
-        }
-      }
-    }
-    if (cell.object === "djBoothR") {
-      // Music notes drifting up from the decks.
+    if (tint) addGlows(cell.object, center);
+    if (MUSIC.has(cell.object)) {
+      // Music notes drifting up from the decks (or the band).
       k.loop(0.9, () => {
         k.add([
-          k.text(k.choose(["♪", "♫"]), { size: 8 }),
+          k.text(k.choose(["♪", "♫"]), { size: 8, font: "monospace" }),
           k.pos(center.add(k.rand(-14, 4), -10)),
           k.color(k.choose([k.rgb(255, 214, 122), k.rgb(224, 80, 138), k.rgb(143, 194, 171)])),
           k.opacity(0.9),
@@ -499,21 +624,53 @@ k.scene("area", (index) => {
     k.z(10),
     "player",
   ]);
+  // Someone who walks along with her (Nathan, at Andy's). He follows the path
+  // she walked, a step behind.
+  let companion = null;
+  const trail = [];
+  if (area.companion) {
+    companion = k.add([k.pos(spawn.add(...(area.companion.from ?? [0, 18]))), k.z(9), { facing: "up" }]);
+    // Nathan's frames are 2px taller than Hannah's; lift him 1px so their feet line up.
+    companion.look = companion.add([k.sprite(area.companion.sprite, { anim: "up-idle" }), k.pos(0, -1), k.anchor("center")]);
+  }
+  // Walk (or stand) facing the way he just moved.
+  const stride = (moved) => {
+    const walking = moved.len() > 0.01;
+    if (walking) companion.facing = turn(companion.facing, moved);
+    const name = `${companion.facing}-${walking ? "walk" : "idle"}`;
+    if (companion.look.getCurAnim()?.name !== name) companion.look.play(name);
+  };
+  const follow = () => {
+    const last = trail[trail.length - 1];
+    if (!last || player.pos.dist(last) > 4) trail.push(player.pos.clone());
+    const before = companion.pos.clone();
+    if (companion.pos.dist(player.pos) > 20) {
+      let step = SPEED * k.dt();
+      while (step > 0 && trail.length) {
+        const d = trail[0].sub(companion.pos);
+        if (d.len() <= step) {
+          step -= d.len();
+          companion.pos = trail.shift();
+        } else {
+          companion.pos = companion.pos.add(d.unit().scale(step));
+          step = 0;
+        }
+      }
+    } else {
+      // Close enough: forget the path so far, and pick it up from here.
+      trail.length = 0;
+    }
+    stride(companion.pos.sub(before));
+    // Whoever is lower on screen is in front.
+    companion.z = companion.pos.y > player.pos.y ? 11 : 9;
+  };
+
   let facing = "down";
   const animate = (moving) => {
     const name = `${facing}-${moving ? "walk" : "idle"}`;
     if (player.getCurAnim()?.name !== name) player.play(name);
   };
-  // Only turn to a new axis when clearly heading that way. Walking at a
-  // diagonal otherwise flips between two directions every frame, which keeps
-  // restarting the walk animation and makes it look stuck.
-  const face = (dir) => {
-    const ax = Math.abs(dir.x);
-    const ay = Math.abs(dir.y);
-    const horizontal = facing === "left" || facing === "right";
-    const useX = horizontal ? !(ay > ax * 1.3) : ax > ay * 1.3;
-    facing = useX ? (dir.x > 0 ? "right" : "left") : dir.y > 0 ? "down" : "up";
-  };
+  const face = (dir) => { facing = turn(facing, dir); };
 
   // HUD: a little pill per thing to collect (notes, boxes).
   const total = area.notes.length;
@@ -523,10 +680,10 @@ k.scene("area", (index) => {
   let cutscene = false;
   let hudX = 4;
   const hudPill = (icon) => {
-    k.add([k.rect(62, 22, { radius: 4 }), k.pos(hudX, 4), k.color(COLORS.paper), k.opacity(0.9), k.fixed(), k.z(89)]);
-    k.add([k.sprite("tiles", { frame: tileFrame(icon) }), k.pos(hudX + 4, 7), k.fixed(), k.z(90)]);
-    const text = k.add([k.text("", { size: 11 }), k.pos(hudX + 24, 9), k.color(COLORS.ink), k.fixed(), k.z(90)]);
-    hudX += 68;
+    k.add([k.rect(58, 24, { radius: 4 }), k.pos(hudX, 4), k.color(COLORS.paper), k.opacity(0.9), k.fixed(), k.z(89)]);
+    k.add([k.sprite("tiles", { frame: tileFrame(icon) }), k.pos(hudX + 4, 8), k.fixed(), k.z(90)]);
+    const text = k.add([k.text("", { size: 20 }), k.pos(hudX + 24, 6), k.color(COLORS.ink), k.fixed(), k.z(90)]);
+    hudX += 64;
     return text;
   };
   const noteCounter = total > 0 ? hudPill("note") : null;
@@ -547,6 +704,8 @@ k.scene("area", (index) => {
     }
   };
   const allFound = () => found === total;
+  // Characters marked `required` have to be talked to before the goal.
+  const allTalked = () => npcs.every((npc) => !npc.data.required || npc.talked);
   const boxesLeft = () => boxTotal - loaded;
   const maybeOpen = () => { if (allFound() && goalDone) openDoors(); };
 
@@ -557,16 +716,77 @@ k.scene("area", (index) => {
   const runGoal = async () => {
     cutscene = true;
     const goal = area.goal;
+    if (goal.meet && companion) await meet(goalSpots[0]);
     if (goal.lines?.length) await say(goal.lines, goal.speaker);
     for (const card of goal.cards ?? []) await showMemory(card, photoKey(card), card.label);
-    if (goal.end?.length) await say(goal.end);
+    if (goal.ticket) await showTicket(goal.ticket);
+    if (goal.end?.length) await say(goal.end, goal.endSpeaker);
     if (goal.advance) {
+      if (goal.fade) await fadeOut();
       nextScene();
       return;
     }
     cutscene = false;
     goalDone = true;
     maybeOpen();
+  };
+
+  // Hannah and whoever came with her walk to either side of the goal (a table)
+  // and face each other: she takes the side she's nearer.
+  let scripted = false;
+  const walkTo = (obj, to, dur, onStep, ease = k.easings.easeInOutQuad) =>
+    new Promise((res) => k.tween(obj.pos.clone(), to, dur, (p) => { obj.pos = p; onStep?.(); }, ease).onEnd(res));
+  const meet = async (spot) => {
+    const left = spot.add(-TILE, 0);
+    const right = spot.add(TILE, 0);
+    const herSide = player.pos.x <= spot.x ? left : right;
+    facing = herSide === left ? "right" : "left";
+    scripted = true;
+    let last = companion.pos.clone();
+    const step = () => { stride(companion.pos.sub(last)); last = companion.pos.clone(); };
+    await Promise.all([walkTo(player, herSide, 0.7), walkTo(companion, herSide === left ? right : left, 0.9, step)]);
+    scripted = false;
+    // Then he turns to face her.
+    companion.facing = herSide === left ? "left" : "right";
+    stride(k.vec2(0, 0));
+    companion.z = 9;
+  };
+
+  // A glimpse of Nathan slipping away just ahead of her (`glimpse` in
+  // content.js): the camera leaves her to follow him along his path until
+  // he's gone, then comes back.
+  let camFocus = null;
+  let camAt = null;
+  let camLag = 0;
+  const wait = (t) => new Promise((res) => k.wait(t, res));
+  const glimpse = async ({ path, carry, lines }) => {
+    cutscene = true;
+    const points = path.map(([c, r]) => k.vec2(c * TILE + TILE / 2, r * TILE + TILE / 2));
+    const him = k.add([k.pos(points[0]), k.z(9), { facing: "down" }]);
+    const parts = [him.add([k.sprite("nathan", { anim: "down-idle" }), k.pos(0, -1), k.anchor("center"), k.opacity(1)])];
+    if (carry) parts.push(him.add([k.sprite("tiles", { frame: tileFrame(carry) }), k.pos(0, -19), k.anchor("center"), k.opacity(1)]));
+    // She turns toward him.
+    face(points[0].sub(player.pos));
+    const alert = player.add([k.text("!", { size: 10 }), k.pos(0, -20), k.anchor("center"), k.color(COLORS.accent)]);
+    camFocus = him;
+    await wait(1.1);
+    for (const to of points.slice(1)) {
+      const d = to.sub(him.pos);
+      him.facing = turn(him.facing, d);
+      parts[0].play(`${him.facing}-walk`);
+      await walkTo(him, to, d.len() / (SPEED * 0.9), null, k.easings.linear);
+    }
+    // And he's gone.
+    await new Promise((res) => k.tween(1, 0, 0.5, (v) => parts.forEach((part) => { part.opacity = v; })).onEnd(res));
+    k.destroy(him);
+    await wait(0.4);
+    camFocus = null;
+    await new Promise((res) => {
+      const check = k.onUpdate(() => { if (camLag < 1) { check.cancel(); res(); } });
+    });
+    k.destroy(alert);
+    cutscene = false;
+    if (lines?.length) await say(lines);
   };
 
   let goalNear = false;
@@ -641,21 +861,23 @@ k.scene("area", (index) => {
       animate(dir.len() > 0);
       if (carried && truckBack.some((cell) => player.pos.dist(cellCenter(cell)) < 26)) loadBox();
     } else {
-      animate(false);
+      animate(scripted);
       holding = false;
       target = null;
     }
 
     if (carried) carried.pos = player.pos.add(0, -16);
+    if (companion && !cutscene) follow();
 
-    // Keep the camera on the player without showing space outside the map.
-    // Snapping to whole screen pixels keeps the pixel art from shimmering.
+    // Keep the camera on the player (or whatever it's following for a moment)
+    // without showing space outside the map.
     const clampAxis = (v, size, view) => (size <= view ? size / 2 : k.clamp(v, view / 2, size - view / 2));
-    const snap = (v) => Math.round(v * ZOOM) / ZOOM;
-    k.setCamPos(
-      snap(clampAxis(player.pos.x, mapW, k.width() / ZOOM)),
-      snap(clampAxis(player.pos.y, mapH, k.height() / ZOOM)),
-    );
+    const look = camFocus?.pos ?? player.pos;
+    const want = k.vec2(clampAxis(look.x, mapW, k.width() / ZOOM), clampAxis(look.y, mapH, k.height() / ZOOM));
+    // Glide over to something and back; otherwise stay locked on her.
+    camAt = camAt && (camFocus || camAt.dist(want) > 1) ? camAt.lerp(want, Math.min(1, k.dt() * 4)) : want;
+    camLag = camAt.dist(want);
+    k.setCamPos(snap(camAt.x), snap(camAt.y));
 
     // Proximity triggers fire once per approach. They only update while no
     // popup is open, so one trigger can't swallow another next to it.
@@ -667,7 +889,7 @@ k.scene("area", (index) => {
       const close = player.pos.dist(npc.pos) < (npc.data.reach ?? 22);
       // Some people are just there for company and don't say anything.
       if (close && !npc.near && npc.data.lines?.length) {
-        say(allFound() && npc.data.linesAfter ? npc.data.linesAfter : npc.data.lines, npc.data.name);
+        say(allFound() && npc.data.linesAfter ? npc.data.linesAfter : npc.data.lines, npc.data.name).then(() => { npc.talked = true; });
       }
       npc.near = close;
       if (busy()) return;
@@ -686,8 +908,12 @@ k.scene("area", (index) => {
       if (close && !goalNear) {
         if (boxesLeft() > 0) {
           say([`${boxesLeft()} more ${boxesLeft() === 1 ? "box" : "boxes"} to load.`]);
-        } else if (allFound()) {
+        } else if (allFound() && allTalked()) {
           runGoal();
+        } else if (allFound()) {
+          // "{who}" names whoever she still has to talk to (each one's `hint`).
+          const who = npcs.filter((npc) => npc.data.required && !npc.talked).map((npc) => npc.data.hint ?? npc.data.name).join(", or ");
+          say((area.goal.lockedTalk ?? area.goal.locked).map((line) => line.replace("{who}", who)), area.goal.speaker);
         } else {
           say(area.goal.locked, area.goal.speaker);
         }
@@ -725,38 +951,99 @@ k.scene("area", (index) => {
   });
 
   maybeOpen();
-  titleCard(area.chapter, area.name).then(() => {
-    if (area.intro?.length) say(area.intro);
+  titleCard(area.chapter, area.name).then(async () => {
+    if (area.intro?.length) await say(area.intro);
+    if (area.glimpse) await glimpse(area.glimpse);
   });
 });
 
+// The end: every note she found, dropped onto the page one by one like a
+// scrapbook, then the sign-off over it.
 k.scene("ending", () => {
+  saveProgress({ done: true });
   k.setBackground(COLORS.ink);
-  k.loop(0.4, () => hearts(k.vec2(k.rand(20, k.width() - 20), k.height() - 10), 1, true));
-
   const center = k.vec2(k.width() / 2, k.height() / 2);
-  const show = (str, size, color, y = 0) =>
+  const wait = (t) => new Promise((res) => k.wait(t, res));
+  const fadeIn = (obj, dur = 0.8) =>
+    new Promise((res) => k.tween(0, 1, dur, (v) => { obj.opacity = v; }).onEnd(res));
+  const show = (str, size, color, pos, z = 100) =>
     k.add([
       k.text(str, { size, width: k.width() - 40, align: "center" }),
-      k.pos(center.add(0, y)),
+      k.pos(pos),
       k.anchor("center"),
       k.color(color),
       k.opacity(0),
       k.fixed(),
+      k.z(z),
     ]);
-  const fadeIn = (obj, dur = 0.8) =>
-    new Promise((res) => k.tween(0, 1, dur, (v) => { obj.opacity = v; }).onEnd(res));
 
+  // A note's photo, or until there is one, the spot in the map where she found it.
+  const SNAP = 64;
+  const snapshot = (area, a, note, n) => {
+    if (note.photo) return [k.sprite(note.photo, { width: SNAP, height: SNAP })];
+    const mapW = area.map[0].length * TILE;
+    const mapH = area.map.length * TILE;
+    const r = area.map.findIndex((row) => row.includes(String(n + 1)));
+    const c = area.map[r].indexOf(String(n + 1));
+    const x = k.clamp(c * TILE + TILE / 2 - SNAP / 2, 0, mapW - SNAP);
+    const y = k.clamp(r * TILE + TILE / 2 - SNAP / 2, 0, mapH - SNAP);
+    const quad = k.quad(x / mapW, y / mapH, SNAP / mapW, SNAP / mapH);
+    const parts = [k.sprite(`map-${a}`, { quad }), k.sprite(`map-${a}-above`, { quad })];
+    const tint = area.tint ?? (area.night ? [11, 16, 48, 0.4] : null);
+    if (tint) parts.push([k.rect(SNAP, SNAP), k.color(tint[0], tint[1], tint[2]), k.opacity(tint[3])]);
+    return parts;
+  };
+  const memories = AREAS.flatMap((area, a) => area.notes.map((note, n) => ({ area, a, note, n })));
+  const COLS = 3;
+  const polaroid = ({ area, a, note, n }, i) => {
+    const row = Math.floor(i / COLS);
+    const inRow = Math.min(COLS, memories.length - row * COLS);
+    const x = k.width() / 2 + (i % COLS - (inRow - 1) / 2) * 100 + k.rand(-6, 6);
+    const y = 110 + row * 100 + k.rand(-5, 5);
+    const card = k.add([
+      k.rect(SNAP + 12, SNAP + 28, { radius: 2 }),
+      k.pos(x, y),
+      k.anchor("center"),
+      k.color(COLORS.paper),
+      k.outline(2, COLORS.muted),
+      k.rotate(k.rand(-3, 3)),
+      k.scale(1.5),
+      k.fixed(),
+      k.z(10 + i),
+    ]);
+    for (const part of snapshot(area, a, note, n)) card.add([...[part].flat(), k.pos(0, -8), k.anchor("center")]);
+    card.add([k.text(note.title, { size: 10, width: SNAP + 8, align: "center" }), k.pos(0, SNAP / 2 + 5), k.anchor("center"), k.color(COLORS.ink)]);
+    // Dropped onto the page.
+    k.tween(1.5, 1, 0.25, (v) => { card.scale = k.vec2(v); }, k.easings.easeOutQuad);
+  };
+
+  // A tap hurries the scrapbook along.
+  let hurry = false;
+  const skip = k.onMousePress(() => { hurry = true; });
   (async () => {
-    await say(ENDING.letter);
-    const intro = show(ENDING.giftIntro, 14, COLORS.paper, -40);
-    await fadeIn(intro);
-    await new Promise((res) => k.wait(1.2, res));
-    const gift = show(ENDING.gift, 22, COLORS.accent, 10);
-    await fadeIn(gift, 1.2);
-    hearts(gift.pos, 30, true);
-    await new Promise((res) => k.wait(1.5, res));
-    await fadeIn(show(ENDING.signoff, 12, COLORS.paper, 90));
+    await fadeIn(show("Year two", 30, COLORS.paper, k.vec2(k.width() / 2, 32)), 1);
+    for (let i = 0; i < memories.length; i++) {
+      polaroid(memories[i], i);
+      if (!hurry) await wait(0.45);
+    }
+    await wait(hurry ? 0.6 : 2.2);
+    skip.cancel();
+
+    // Dim the scrapbook and sign off over it.
+    const dim = k.add([k.rect(k.width(), k.height()), k.color(COLORS.ink), k.opacity(0), k.fixed(), k.z(90)]);
+    k.tween(0, 0.9, 1.2, (v) => { dim.opacity = v; });
+    k.loop(0.4, () => hearts(k.vec2(k.rand(20, k.width() - 20), k.height() - 10), 1, true, 95));
+    await fadeIn(show(ENDING.signoff, 30, COLORS.paper, center.add(0, -20)), 1.2);
+    hearts(center.add(0, -20), 20, true, 101);
+    await wait(1.5);
+    await fadeIn(show(ENDING.closing, 20, COLORS.accent, center.add(0, 34)));
+    await wait(2);
+    const again = show("tap to play again", 20, COLORS.muted, center.add(0, 150));
+    await fadeIn(again);
+    again.onUpdate(() => { again.opacity = 0.5 + 0.5 * Math.sin(k.time() * 3); });
+    const restart = () => k.go("title");
+    k.onMousePress(restart);
+    k.onKeyPress(["space", "enter"], restart);
   })();
 });
 

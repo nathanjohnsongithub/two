@@ -9,7 +9,9 @@ export const k = kaplay({
   crisp: true,
   texFilter: "nearest",
   global: false,
-  font: "monospace",
+  // Jersey 10, a pixel font (public/fonts). It's only crisp at whole multiples
+  // of its 10px grid, so every text size in the game is 10, 20, 30 or 40.
+  font: "pixel",
   background: [26, 20, 32],
   touchToMouse: true,
 });
