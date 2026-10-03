@@ -737,6 +737,8 @@ k.scene("area", (index) => {
   // and forth (or round and round, with `loop`), or standing `at` a tile facing
   // `face`. Anyone with `lines` stops, turns to her and says them when she
   // walks up. `look` picks who they are (a row in tools/crowd_sprite.py).
+  // With `once`, they walk the path a single time and leave, and only talk to
+  // her the first time.
   const toward = (d) => (Math.abs(d.x) > Math.abs(d.y) ? (d.x > 0 ? "right" : "left") : d.y > 0 ? "down" : "up");
   const people = (area.people ?? []).map((data) => {
     const points = (data.path ?? [data.at]).map(tileCenter);
@@ -745,8 +747,9 @@ k.scene("area", (index) => {
       k.sprite("crowd", { anim: `${data.look}-${facing}-idle` }),
       k.pos(points[0]),
       k.anchor("center"),
+      k.opacity(1),
       k.z(9),
-      { data, facing, points, next: 1, dir: 1, rest: k.rand(0, 2), near: false, talking: false },
+      { data, facing, points, next: 1, dir: 1, rest: k.rand(0, 2), near: false, talking: false, said: false, gone: false },
     ]);
   });
   const pose = (person, walking) => {
@@ -756,6 +759,13 @@ k.scene("area", (index) => {
   const walkPeople = () => {
     for (const person of people) {
       const { points, data } = person;
+      if (person.gone) continue;
+      // Someone passing through only once waits out the intro and any popup,
+      // so she doesn't miss them.
+      if (data.once && busy() && !person.talking) {
+        pose(person, false);
+        continue;
+      }
       if (person.talking || points.length < 2 || (person.rest -= k.dt()) > 0) {
         if (!person.talking && points.length < 2) person.facing = data.face ?? "down";
         pose(person, false);
@@ -774,6 +784,11 @@ k.scene("area", (index) => {
         person.pos = to.clone();
         if (data.loop) {
           person.next = (person.next + 1) % points.length;
+        } else if (data.once && !points[person.next + 1]) {
+          // Off they go, for good.
+          person.gone = true;
+          k.tween(1, 0, 0.4, (v) => { person.opacity = v; }).onEnd(() => k.destroy(person));
+          continue;
         } else {
           // The end of the path: stop for a moment, then head back.
           if (!points[person.next + person.dir]) {
@@ -1150,7 +1165,7 @@ k.scene("area", (index) => {
     k.destroy(carried);
     carried = null;
     loaded++;
-    // Let the truck respond right away ("2 more boxes", or finishing the chapter).
+    // Let the truck respond right away (finishing the chapter after the last box).
     goalNear = false;
     updateCounter();
     const last = boxesLeft() === 0;
@@ -1257,8 +1272,10 @@ k.scene("area", (index) => {
     }
 
     for (const person of people) {
+      if (person.gone) continue;
       const close = player.pos.dist(person.pos) < 22;
-      if (close && !person.near && person.data.lines?.length) {
+      if (close && !person.near && person.data.lines?.length && !(person.data.once && person.said)) {
+        person.said = true;
         person.talking = true;
         person.facing = toward(player.pos.sub(person.pos));
         pose(person, false);
@@ -1281,10 +1298,9 @@ k.scene("area", (index) => {
 
     if (area.goal && !goalDone && !carried) {
       const close = goalSpots.some((spot) => player.pos.dist(spot) < 24);
-      if (close && !goalNear) {
-        if (boxesLeft() > 0) {
-          say([`${boxesLeft()} more ${boxesLeft() === 1 ? "box" : "boxes"} to load.`]);
-        } else if (allFound() && allTalked()) {
+      // While there are boxes left to load the truck says nothing (the HUD counts them).
+      if (close && !goalNear && boxesLeft() === 0) {
+        if (allFound() && allTalked()) {
           runGoal();
         } else if (allFound()) {
           // "{who}" names whoever she still has to talk to (each one's `hint`).

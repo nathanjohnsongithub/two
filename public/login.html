@@ -9,7 +9,10 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <style>
-      /* Jersey 10 is drawn on a 10px grid: keep font sizes multiples of 10. */
+      /* A copy of the game's title screen (the "title" scene in src/main.js):
+         the same 320x480 letterboxed stage, laid out in game pixels. --g is one
+         game pixel. The rooftop is a still of the title scene at 1x
+         (login-rooftop.png: 224x128 world pixels, shown at the game's 2x zoom). */
       @font-face {
         font-family: "Jersey 10";
         src: url("/fonts/Jersey10.ttf") format("truetype");
@@ -18,89 +21,153 @@
       * { box-sizing: border-box; }
       html, body {
         margin: 0;
-        min-height: 100%;
-        background: #141a3c;
-        color: #fff8ee;
-        font-family: "Jersey 10", ui-monospace, monospace;
-      }
-      body {
-        min-height: 100vh;
-        min-height: 100dvh;
-        display: grid;
-        place-items: center;
-        padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+        height: 100%;
+        background: #1b2340; /* the letterbox bars, like the game's */
         overflow: hidden;
       }
-      #stars { position: fixed; inset: 0; pointer-events: none; }
-      .star { position: absolute; width: 3px; height: 3px; background: #c9cde6; animation: twinkle 3s steps(2) infinite; }
-      .star.gold { background: #d8b45a; }
-      @keyframes twinkle { 50% { opacity: 0.3; } }
-
-      main { position: relative; width: 100%; max-width: 340px; text-align: center; }
-      h1 { margin: 0; font-size: 70px; font-weight: normal; line-height: 1; letter-spacing: 1px; }
-      .names { margin: 6px 0 0; font-size: 30px; color: #e8585e; }
-
-      .pair { display: flex; justify-content: center; align-items: flex-end; gap: 6px; margin: 36px 0 30px; position: relative; }
-      .sprite { background-repeat: no-repeat; image-rendering: pixelated; }
-      .hannah { width: 64px; height: 96px; background-image: url("/sprites/hannah.png"); background-size: 768px 96px; }
-      .nathan { width: 64px; height: 104px; background-image: url("/sprites/nathan.png"); background-size: 768px 104px; }
-      .heart { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); color: #e8585e; font: 22px system-ui, sans-serif; animation: float 2.4s ease-in-out infinite; }
-      @keyframes float { 50% { transform: translate(-50%, -6px); } }
-
-      form { display: grid; gap: 12px; }
-      input, button {
-        font: inherit;
-        font-size: 30px;
+      body {
+        display: grid;
+        place-items: center;
+        height: 100svh;
+        font-family: "Jersey 10", ui-monospace, monospace;
+        color: #fffaf4;
+      }
+      .stage {
+        position: relative;
+        width: min(100vw, 100svh * 2 / 3);
+        aspect-ratio: 2 / 3;
+        container-type: size;
+        overflow: hidden;
+        background: #151b3a; /* the night sky under the game's tint */
+        --g: calc(100cqw / 320);
+      }
+      .at {
+        position: absolute;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        margin: 0;
         line-height: 1;
-        border: 3px solid #fff8ee;
-        border-radius: 0;
-        padding: 10px 14px;
-        box-shadow: 4px 4px 0 #0a0d22;
+        white-space: nowrap;
+        font-weight: normal;
+      }
+      h1.at { top: calc(64 * var(--g)); font-size: calc(40 * var(--g)); }
+      .subtitle { top: calc(100 * var(--g)); font-size: calc(20 * var(--g)); color: #e56b6f; }
+
+      .star { position: absolute; width: calc(2 * var(--g)); height: calc(2 * var(--g)); }
+
+      .rooftop {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: calc(448 * var(--g));
+        height: calc(256 * var(--g));
+        background: url("/login-rooftop.png") 0 0 / 100% 100%;
+        image-rendering: pixelated;
+        /* Drift slowly along the skyline and back, like the title screen. */
+        animation: drift 21s ease-in-out -10.5s infinite alternate;
+      }
+      @keyframes drift {
+        from { transform: translateX(0); }
+        to { transform: translateX(calc(-128 * var(--g))); }
+      }
+      .heart {
+        position: absolute;
+        color: #e56b6f;
+        font-family: ui-monospace, monospace;
+        line-height: 1;
+        pointer-events: none;
+      }
+
+      /* Drawn like the game's buttons: a 180x30 box, 20px text. */
+      form { display: contents; }
+      .box {
+        position: absolute;
+        left: 50%;
+        width: calc(180 * var(--g));
+        height: calc(30 * var(--g));
+        transform: translate(-50%, -50%);
+        border: calc(2 * var(--g)) solid;
+        border-radius: calc(4 * var(--g));
+        font: inherit;
+        font-size: calc(20 * var(--g));
+        line-height: 1;
+        text-align: center;
+        padding: 0;
         -webkit-appearance: none;
         appearance: none;
       }
-      input { background: #fff8ee; color: #2b1d1a; text-align: center; }
-      input::placeholder { color: #a99a8c; }
-      input:focus { outline: 3px solid #e8585e; outline-offset: 2px; }
-      button { background: #e8585e; color: #fff8ee; cursor: pointer; }
-      button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #0a0d22; }
-      button:disabled { opacity: 0.6; cursor: default; }
-      button:focus-visible { outline: 3px solid #fff8ee; outline-offset: 2px; }
-      .err { min-height: 30px; margin: 4px 0 0; font-size: 20px; color: #f39a9a; }
+      input.box { top: calc(148 * var(--g)); background: #3a2e39; border-color: #9a8c98; color: #fffaf4; }
+      input.box::placeholder { color: #9a8c98; opacity: 1; }
+      button.box { top: calc(186 * var(--g)); background: #fffaf4; border-color: #3a2e39; color: #3a2e39; cursor: pointer; }
+      .box:focus-visible { outline: calc(2 * var(--g)) solid #e56b6f; outline-offset: calc(2 * var(--g)); }
+      button.box:active { filter: brightness(0.9); }
+      button.box:disabled { opacity: 0.7; }
+      .err { top: calc(214 * var(--g)); font-size: calc(20 * var(--g)); color: #e56b6f; }
       .shake { animation: shake 0.3s steps(4); }
-      @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+      @keyframes shake {
+        25% { transform: translate(calc(-50% - 4 * var(--g)), -50%); }
+        75% { transform: translate(calc(-50% + 4 * var(--g)), -50%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .rooftop { animation: none; transform: translateX(calc(-64 * var(--g))); }
+      }
     </style>
   </head>
   <body>
-    <div id="stars" aria-hidden="true"></div>
-    <main>
-      <h1>Year Two</h1>
-      <p class="names">Hannah &amp; Nathan</p>
-
-      <div class="pair" aria-hidden="true">
-        <span class="heart">♥</span>
-        <div class="sprite hannah"></div>
-        <div class="sprite nathan"></div>
-      </div>
-
+    <main class="stage">
+      <div id="stars" aria-hidden="true"></div>
+      <div class="rooftop" id="rooftop" role="img" aria-label="Hannah and Nathan at the rooftop railing, looking out at the Chicago skyline"></div>
+      <h1 class="at">Year Two</h1>
+      <p class="at subtitle">Hannah &amp; Nathan</p>
       <form id="form">
-        <input id="pw" type="password" placeholder="password" autocomplete="current-password" aria-label="Password" required />
-        <button id="go" type="submit">Let me in</button>
+        <input id="pw" class="box" type="password" placeholder="password" autocomplete="current-password" aria-label="Password" required />
+        <button id="go" class="box" type="submit">Let me in</button>
       </form>
-      <p id="err" class="err" role="alert"></p>
+      <p id="err" class="at err" role="alert"></p>
     </main>
 
     <script>
-      // A sky like the title screen's.
+      const g = (n) => `calc(${n} * var(--g))`;
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      // 30 twinkling stars above the skyline, white and gold, dimmed by the night tint.
       const stars = document.getElementById("stars");
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 30; i++) {
         const s = document.createElement("span");
-        s.className = "star" + (Math.random() < 0.3 ? " gold" : "");
-        s.style.left = Math.random() * 100 + "%";
-        s.style.top = Math.random() * 100 + "%";
-        s.style.animationDelay = -Math.random() * 3 + "s";
+        s.className = "star";
+        s.style.left = g(Math.floor(rand(0, 160)) * 2);
+        s.style.top = g(Math.floor(rand(2, 110)) * 2);
+        s.style.background = Math.random() < 0.5 ? "#9d9ca6" : "#99875c";
+        const speed = rand(1, 3);
+        if (!still) s.animate([{ opacity: 1 }, { opacity: 0.1 }], { duration: (Math.PI / speed) * 1000, iterations: Infinity, direction: "alternate", easing: "ease-in-out", delay: -rand(0, 3000) });
         stars.appendChild(s);
       }
+
+      // A heart floats up from the two of them every 1.4s.
+      const rooftop = document.getElementById("rooftop");
+      if (!still) setInterval(() => {
+        if (document.hidden) return;
+        const h = document.createElement("span");
+        h.className = "heart";
+        h.textContent = "♥";
+        const size = rand(8, 16);
+        h.style.fontSize = g(size);
+        h.style.left = g(224 + rand(-12, 12) - size / 2);
+        h.style.top = g(148 + rand(-6, 6) - size / 2);
+        rooftop.appendChild(h);
+        const life = rand(0.6, 1.2);
+        const rise = rand(30, 60) * life;
+        const dx = rand(-0.4, 0.4) * rise;
+        h.animate(
+          [
+            { transform: "translate(0, 0)", opacity: 1 },
+            { transform: `translate(${g(dx * (1 - 0.4 / life))}, ${g(-rise * (1 - 0.4 / life))})`, opacity: 1, offset: 1 - 0.4 / life },
+            { transform: `translate(${g(dx)}, ${g(-rise)})`, opacity: 0 },
+          ],
+          { duration: life * 1000 },
+        ).onfinish = () => h.remove();
+      }, 1400);
 
       // Only same-site paths, so ?return= can't send her somewhere else.
       const ret = new URLSearchParams(location.search).get("return");
@@ -113,9 +180,9 @@
 
       function fail(message) {
         err.textContent = message;
-        form.classList.remove("shake");
-        void form.offsetWidth; // restart the shake
-        form.classList.add("shake");
+        input.classList.remove("shake");
+        void input.offsetWidth; // restart the shake
+        input.classList.add("shake");
         input.select();
       }
 

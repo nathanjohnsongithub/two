@@ -295,7 +295,7 @@ export const AREAS = [
     glimpse: {
       sprite: "nathan_gown",
       path: [[9, 10], [9, 19], [14, 19], [14, 15]],
-      lines: ["Was that Nathan, in his cap and gown?", "Everyone looks the same in these... but I'd know that walk anywhere."],
+      lines: ["Was that Nathan, in his cap and gown?", "Everyone looks the same in these... but I'd know that sexy back and giant butt from anywhere."],
     },
     // Classmates in their gowns wandering the quad, and families.
     people: [
@@ -347,8 +347,8 @@ export const AREAS = [
       "###################~~~",
     ],
     notes: [
-      { title: "We did it", caption: "Two Loyola graduates look as us go", photo: "public/photos/chapter_3/h_and_n_grad_photo.JPG" },
-      { title: "The lake", caption: "Some would say the only redeming quality about this school", photo: "public/photos/chapter_3/the_lake.jpeg" },
+      { title: "We did it", caption: "Two Loyola graduates look as us go!", photo: "public/photos/chapter_3/h_and_n_grad_photo.JPG" },
+      { title: "The lake", caption: "Some would say the only redeming quality about this school.", photo: "public/photos/chapter_3/the_lake.jpeg" },
     ],
     // Classmates in cap and gown (frame picks the look in tools/grad_sprite.py).
     // She has to talk to all three before the cap on the chair.
@@ -395,7 +395,7 @@ export const AREAS = [
         "A graduation cap, left on a chair. The tassel's already turned.",
         "There's a note tucked inside:",
         "\"Congrats, Hannah! I'm so proud of you <3 Keep looking I'm still not here -Nathan\"",
-        "Of course he's not here.",
+        "Bruh, Of course he's not here.",
       ],
       cards: [],
       end: ["(The door is open.)"],
@@ -432,9 +432,9 @@ export const AREAS = [
       carry: "box",
       lines: ["Was that Nathan, carrying only ONE box?","Bum", "...Guess the rest are up to me."],
     },
-    // A neighbor out for a walk down the alley.
+    // A neighbor out for a walk down the alley: through once, then gone.
     people: [
-      { look: 25, path: [[1, 7], [38, 7]], lines: ["Moving out? Good luck with all that.", "I'd help, but I just got back from the gym."] },
+      { look: 25, path: [[-1, 7], [41, 7]], once: true, lines: ["Moving out? Good luck with all that.", "I'd help, but I just got back from the gym."] },
     ],
     details: {
       k: ["A stray cat. It watches you carry boxes.", "Kind of like that one we saw almost two years ago off the pier.", "It does not offer to help.", "Hater ass cat."],
@@ -484,11 +484,11 @@ export const AREAS = [
       X: "pickupTable", m: "bagelMenu", k: "bikeRack", F: "fireEscapeFront", A: "taxi", a: "taxiEast",
     },
     music: "morning",
-    intro: ["The last date before your new job.", "First stop: Decker's Bagels."],
+    intro: ["Our last date before your new job.", "First stop: Decker's Bagels."],
     // Leaving the pickup table, grinning.
     glimpse: {
       path: [[10, 5], [13, 5], [13, 6], [15, 6]],
-      lines: ["Hold on... was that Nathan, grinning about something?", "Gone again."],
+      lines: ["Hold on... was that Nathan, with a shit eating grin?", "Gone yet again."],
     },
     // The line at the window, facing it. They turn around to talk.
     people: [
@@ -498,7 +498,7 @@ export const AREAS = [
         look: 13,
         at: [6, 6],
         face: "up",
-        lines: ["Somebody just ordered two sandwiches and took off grinning.", "Said something about dinner plans?"],
+        lines: ["Somebody just ordered two sandwiches and took off grinning.", "Said something about handrolls?"],
       },
       // A jogger on the sidewalk.
       { look: 26, path: [[2, 8], [13, 8]], speed: 48 },
@@ -510,7 +510,7 @@ export const AREAS = [
       "##I###(w)###I###",
       ":m:::::::X:::k::",
       "::Y:::::::::::Y:",
-      "::::::::::1:::::",
+      "::::::::::::::::",
       ":hTh:::::::hTh::",
       ":e::::::::::::e:",
       ";;AA;;====;;;;;;",
@@ -520,9 +520,8 @@ export const AREAS = [
       "##II###II###II##",
       "##II###II###II##",
     ],
-    notes: [
-      { title: "Decker's", caption: "Sourdough bagels from a pop-up window. The last date before your first day started here.", photo: null },
-    ],
+    // No notes here: she talks to the worker, then picks up the bag.
+    notes: [],
     // The worker leaning out of the window (`at` puts her in the window tile
     // instead of on an N).
     npcs: [
@@ -531,9 +530,11 @@ export const AREAS = [
         sprite: "locals",
         frame: 2,
         at: "w",
+        required: true,
+        hint: "the window",
         lines: [
           "Morning! You must be Hannah.",
-          "He already ordered for you: a bacon, egg and cheese, and a chicken apple sausage and egg.",
+          "He already ordered for you: a Decker's Classic Bacon & Egg, and a Maple Chicken Sausage & Egg Bagel Sandwich.",
           "It's in the bag on the table.",
         ],
       },
@@ -543,13 +544,10 @@ export const AREAS = [
     },
     goal: {
       tile: "X",
-      locked: ["A paper bag with a heart drawn on it... Look around first."],
+      lockedTalk: ["A paper bag with a heart drawn on it...", "Better check at {who} first."],
       lines: ["A paper bag with a heart drawn on it. Still warm.", "Two bagel sandwiches inside."],
-      cards: [
-        { label: "BREAKFAST", title: "Bacon, egg & cheese", caption: "On a sourdough bagel.", photo: null },
-        { label: "BREAKFAST", title: "Chicken apple sausage & egg", caption: "On a sourdough bagel.", photo: null },
-      ],
-      end: ["There's a note stapled to the bag:", "\"Eat up. Dinner's in the West Loop tonight. -N\""],
+      cards: [],
+      end: ["There's a note stapled to the bag:", "\"Eat up. We're heading to get dinner's in the West Loop tonight. -Nathan\""],
       advance: true,
     },
   },
@@ -575,7 +573,7 @@ export const AREAS = [
       E: "hinokiEmpty", o: "stool", u: "stool", j: "stoolJacket", A: "andon", l: "lantern", I: "prepIsland",
     },
     music: "yokocho",
-    intro: ["Dinner at Yokocho, in the West Loop.", "Handrolls at the counter... and hopefully Nathan."],
+    intro: ["Dinner at Yokocho, in the West Loop.", "What an awesome and amazing place to eat! I'm so glad that Nathan had this awesome idea.", "There are some handrolls at the counter... and hopefully Nathan."],
     map: [
       "#KK#L##n##L#KK##",
       "#...[cccccc]...#",
@@ -595,7 +593,7 @@ export const AREAS = [
       "#######n########",
     ],
     notes: [
-      { title: "Yokocho", caption: "Handrolls at the counter, the chefs right in front of us. Dinner before your big day.", photo: null },
+      { title: "Yokocho", caption: "A fun Japanese Izakaya with some handrolls and some drinks. You also can't forget the sando that was way worse than the one we made...", photo: "public/photos/chapter_5-2/yokocho.jpeg" },
     ],
     // The chefs inside the U; `reach` lets them talk to you across the counter.
     npcs: [
@@ -639,10 +637,8 @@ export const AREAS = [
       tile: "G",
       locked: ["Your seat's saved... but there's still a note around here somewhere."],
       lines: ["Two seats saved at the counter. One's empty.", "Waiting at your spot: a strawberry matcha cream sando."],
-      cards: [
-        { label: "DESSERT", title: "Strawberry matcha cream sando", caption: "Strawberries and matcha cream on soft milk bread.", photo: null },
-      ],
-      end: ["There's a note under the plate:", "\"Save room. Drinks on the roof of the Carbide & Carbon Building. -N\""],
+      cards: [],
+      end: ["There's a note under the plate:", "\"Save room some room! We're off for drinks on the roof of the Carbide & Carbon Building. -Nathan\""],
       advance: true,
     },
   },
@@ -664,10 +660,10 @@ export const AREAS = [
     floors: { ".": "deck", a: "deck", b: "deck", m: "deck", d: "deck" },
     objects: { V: "view", k: "cityLights", c: "bar", T: "bistroTable", H: "heater", Q: "djBooth", Z: "speaker" },
     music: "rooftop",
-    intro: ["The rooftop of the Carbide & Carbon Building.", "Drinks after dinner, to celebrate your new job."],
+    intro: ["The rooftop of the Carbide & Carbon Building.", "Drinks with a view to celebrate your new job."],
     // Right after the intro, the camera finds him at the railing. He turns
     // around, and she says `lines`.
-    reveal: { lines: ["...Nathan?", "He's really here."] },
+    reveal: { lines: ["...Nathan?", "He's really here.", "I would recognize those toned and humongous shoulders anywhere."] },
     map: [
       "VVVVVVVVVVVVVV",
       "VVVVVVVVVVVVVV",
@@ -735,15 +731,16 @@ export const AREAS = [
       // Until she's talked to the DJ and the bartender. {who} is whoever's left.
       lockedTalk: ["Not yet! Go say hi to {who} first."],
       lines: [
-        "You found me.",
+        "Han!",
+        "You finally caught up to me.",
         "Sorry for making you chase me through our whole year.",
-        "Every note was leading you here.",
+        "I hope you enjoyed all the notes and the memories.",
       ],
       cards: [],
       end: [
-        "Happy anniversary, Hannah.",
-        "But I have one more gift for you.",
-        "This one isn't a memory yet. It's for the future.",
+        "Happy two year anniversary Honey.",
+        "But I still have one more gift for you.",
+        "This one isn't a memory yet. It's in the future.",
         "Come on. I'll show you.",
       ],
       endSpeaker: "Nathan",
@@ -754,7 +751,7 @@ export const AREAS = [
   },
   {
     // The last gift: a night out that hasn't happened yet.
-    chapter: "Someday soon",
+    chapter: "Chapter 6",
     name: "Andy's Jazz Club",
     background: "#1a1420",
     // The house lights down low...
@@ -778,7 +775,7 @@ export const AREAS = [
     },
     // The band's playing.
     music: "andys",
-    intro: ["Andy's Jazz Club, downtown.", "The band's already playing."],
+    intro: ["Andy's Jazz Club, River North.", "The band's already playing.", "Let's go get our table."],
     map: [
       "#KKKKFCCAACCJFJ#",
       "#_m__.,pp,q,...#",
@@ -829,15 +826,15 @@ export const AREAS = [
       meet: true,
       speaker: "Nathan",
       locked: [],
-      lines: ["Front row, right by the band.", "So... about that one more gift."],
+      lines: ["So...", "about that final gift I had in mind."],
       ticket: {
-        label: "ONE MORE GIFT",
+        label: "ONE FINAL GIFT",
         admit: "ADMIT TWO",
         venue: "Andy's Jazz Club",
         detail: "Live jazz · River North",
         // TODO: the real date and time of the show.
         date: "Friday October 23rd · 7:45 PM",
-        stub: "Seat: next to me 😼",
+        stub: "Seat: my lap",
         caption: "",
       },
       end: ["I can't wait.", "Here's to year three, Hannah."],
