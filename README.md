@@ -10,6 +10,22 @@ npm run dev      # also serves on your network, so you can test on your phone
 npm run build    # outputs to dist/ (Vercel picks this up automatically)
 ```
 
+## Password
+
+On Vercel, the whole site (game, photos, everything) is behind a password, like the scrapbook. `npm run dev` skips it, so the game stays open while you work on it.
+
+- `middleware.js` runs before every request and sends anyone without a valid session cookie to `public/login.html` (only the files that page needs are open: its font, the two sprites, the favicons).
+- `api/login.js` checks the password against a scrypt hash and sets a signed cookie that lasts a year. Ten wrong tries in five minutes and it makes you wait.
+- `lib/session.js` signs and checks the cookie (shared by both).
+
+To set or change the password:
+
+```sh
+node tools/make_password.js 'the password'
+```
+
+Paste the three lines it prints (`SITE_PW_SALT`, `SITE_PW_HASH`, `SESSION_SECRET`) into the Vercel project's **Settings → Environment Variables**, then redeploy. A new `SESSION_SECRET` signs everyone out. Without those variables, nobody can sign in.
+
 ## Editing the story
 
 Everything personal lives in `src/content.js`:
@@ -58,3 +74,4 @@ The font is [Jersey 10](https://fonts.google.com/specimen/Jersey+10) (`public/fo
 - `src/content.js`: all story text, maps and photos
 - `src/ui.js`: dialogue box, photo cards, chapter titles, hearts
 - `src/kaplay.js`: engine setup (320×480 portrait canvas, letterboxed)
+- `middleware.js`, `api/login.js`, `lib/session.js`, `public/login.html`: the password gate

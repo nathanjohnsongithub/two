@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Year Two</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <style>
+      /* Jersey 10 is drawn on a 10px grid: keep font sizes multiples of 10. */
+      @font-face {
+        font-family: "Jersey 10";
+        src: url("/fonts/Jersey10.ttf") format("truetype");
+        font-display: block;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: #141a3c;
+        color: #fff8ee;
+        font-family: "Jersey 10", ui-monospace, monospace;
+      }
+      body {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+        overflow: hidden;
+      }
+      #stars { position: fixed; inset: 0; pointer-events: none; }
+      .star { position: absolute; width: 3px; height: 3px; background: #c9cde6; animation: twinkle 3s steps(2) infinite; }
+      .star.gold { background: #d8b45a; }
+      @keyframes twinkle { 50% { opacity: 0.3; } }
+
+      main { position: relative; width: 100%; max-width: 340px; text-align: center; }
+      h1 { margin: 0; font-size: 70px; font-weight: normal; line-height: 1; letter-spacing: 1px; }
+      .names { margin: 6px 0 0; font-size: 30px; color: #e8585e; }
+
+      .pair { display: flex; justify-content: center; align-items: flex-end; gap: 6px; margin: 36px 0 30px; position: relative; }
+      .sprite { background-repeat: no-repeat; image-rendering: pixelated; }
+      .hannah { width: 64px; height: 96px; background-image: url("/sprites/hannah.png"); background-size: 768px 96px; }
+      .nathan { width: 64px; height: 104px; background-image: url("/sprites/nathan.png"); background-size: 768px 104px; }
+      .heart { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); color: #e8585e; font: 22px system-ui, sans-serif; animation: float 2.4s ease-in-out infinite; }
+      @keyframes float { 50% { transform: translate(-50%, -6px); } }
+
+      form { display: grid; gap: 12px; }
+      input, button {
+        font: inherit;
+        font-size: 30px;
+        line-height: 1;
+        border: 3px solid #fff8ee;
+        border-radius: 0;
+        padding: 10px 14px;
+        box-shadow: 4px 4px 0 #0a0d22;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      input { background: #fff8ee; color: #2b1d1a; text-align: center; }
+      input::placeholder { color: #a99a8c; }
+      input:focus { outline: 3px solid #e8585e; outline-offset: 2px; }
+      button { background: #e8585e; color: #fff8ee; cursor: pointer; }
+      button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #0a0d22; }
+      button:disabled { opacity: 0.6; cursor: default; }
+      button:focus-visible { outline: 3px solid #fff8ee; outline-offset: 2px; }
+      .err { min-height: 30px; margin: 4px 0 0; font-size: 20px; color: #f39a9a; }
+      .shake { animation: shake 0.3s steps(4); }
+      @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+    </style>
+  </head>
+  <body>
+    <div id="stars" aria-hidden="true"></div>
+    <main>
+      <h1>Year Two</h1>
+      <p class="names">Hannah &amp; Nathan</p>
+
+      <div class="pair" aria-hidden="true">
+        <span class="heart">♥</span>
+        <div class="sprite hannah"></div>
+        <div class="sprite nathan"></div>
+      </div>
+
+      <form id="form">
+        <input id="pw" type="password" placeholder="password" autocomplete="current-password" aria-label="Password" required />
+        <button id="go" type="submit">Let me in</button>
+      </form>
+      <p id="err" class="err" role="alert"></p>
+    </main>
+
+    <script>
+      // A sky like the title screen's.
+      const stars = document.getElementById("stars");
+      for (let i = 0; i < 60; i++) {
+        const s = document.createElement("span");
+        s.className = "star" + (Math.random() < 0.3 ? " gold" : "");
+        s.style.left = Math.random() * 100 + "%";
+        s.style.top = Math.random() * 100 + "%";
+        s.style.animationDelay = -Math.random() * 3 + "s";
+        stars.appendChild(s);
+      }
+
+      // Only same-site paths, so ?return= can't send her somewhere else.
+      const ret = new URLSearchParams(location.search).get("return");
+      const next = ret && ret.startsWith("/") && !ret.startsWith("//") ? ret : "/";
+
+      const form = document.getElementById("form");
+      const input = document.getElementById("pw");
+      const go = document.getElementById("go");
+      const err = document.getElementById("err");
+
+      function fail(message) {
+        err.textContent = message;
+        form.classList.remove("shake");
+        void form.offsetWidth; // restart the shake
+        form.classList.add("shake");
+        input.select();
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        err.textContent = "";
+        go.disabled = true;
+        try {
+          const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ password: input.value }),
+          });
+          if (res.ok) return location.replace(next);
+          const body = await res.json().catch(() => ({}));
+          fail(body.error || "That's not it. Try again?");
+        } catch {
+          fail("Couldn't connect. Try again?");
+        } finally {
+          go.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
