@@ -7,7 +7,10 @@ tables (Chinatown), 2 the Decker's worker leaning out of the pop-up window
 line, 5 and 6 the chefs at Yokocho, then on the rooftop: 7-10 guests sitting
 at tables facing right, 11-14 the same guests facing left, 15 the bartender,
 16 the DJ, then at Andy's Jazz Club: 17 the pianist, 18 the drummer, 19 the
-singer, 20 the sax player, 21 the host.
+singer, 20 the sax player, 21 the host, 22 the bartender at Andy's. Then
+more guests at tables: 23-37 facing right (guests 4-18 in GUESTS) and 38-52
+the same ones facing left. Guest n faces right at frame n + 19 and left at
+n + 34 (for n >= 4).
 Run:  python3 tools/local_sprite.py
 """
 
@@ -46,6 +49,16 @@ PALETTE = {
     "M": "#1f1c22",  # black dress
     "z": "#8a939c",  # microphone
     "$": "#c98f3a",  # brass
+    # More guests
+    "a": "#a0522d",  # auburn hair
+    "x": "#f3d2b8",  # fair skin
+    "u": "#7a4a2e",  # dark skin
+    "P": "#2a9d8f",  # teal
+    "E": "#e07a8a",  # pink
+    "O": "#c8603a",  # rust
+    "U": "#6a8cc4",  # sky blue
+    "Z": "#9c7cc4",  # lavender
+    "j": "#5a4636",  # brown pants
 }
 
 AUNTIE = [
@@ -241,12 +254,46 @@ SEATED = [
     "................",
 ]
 
-# (hair, skin, top, pants) for each guest, as palette letters.
+# The same guest with longer hair, down past the shoulders...
+SEATED_LONG = SEATED[:9] + [
+    "...oHHHSSSmo....",
+    "...oHHHoSSo.....",
+    "..|oHHoCCCo.....",
+    "..|oHHCCCCCo....",
+    "..|ooCCCCCCSo...",
+] + SEATED[14:]
+
+# ...or up in a bun.
+SEATED_BUN = [
+    "................",
+    "....ooo.........",
+    "...oHHHo........",
+    "....oHHoooo.....",
+    "....oHHHHHHo....",
+] + SEATED[5:]
+
+# (hair, skin, top, pants, hair style) for each guest, as palette letters.
 GUESTS = [
-    ("H", "S", "M", "M"),
-    ("y", "S", "K", "J"),
-    ("A", "s", "W", "V"),
-    ("H", "s", "D", "B"),
+    ("H", "S", "M", "M", "short"),
+    ("y", "S", "K", "J", "short"),
+    ("A", "s", "W", "V", "short"),
+    ("H", "s", "D", "B", "short"),
+    # More guests (frames 23 on), so nobody's sitting at two tables at once.
+    ("a", "x", "P", "B", "long"),
+    ("H", "u", "R", "M", "short"),
+    ("h", "S", "V", "T", "short"),
+    ("H", "S", "E", "J", "bun"),
+    ("y", "x", "U", "B", "long"),
+    ("A", "u", "Y", "M", "bun"),
+    ("H", "s", "G", "J", "short"),
+    ("A", "S", "O", "B", "long"),
+    ("H", "x", "Z", "M", "long"),
+    ("M", "u", "I", "B", "short"),
+    ("h", "s", "R", "T", "bun"),
+    ("a", "S", "W", "j", "short"),
+    ("H", "u", "P", "J", "long"),
+    ("y", "S", "D", "j", "bun"),
+    ("A", "x", "U", "T", "short"),
 ]
 
 
@@ -362,9 +409,10 @@ SAX = [
 ]
 
 
-def guest(hair, skin, top, pants):
+def guest(hair, skin, top, pants, style):
     table = str.maketrans({"H": hair, "S": skin, "C": top, "J": pants})
-    return [r.translate(table) for r in SEATED]
+    rows = {"short": SEATED, "long": SEATED_LONG, "bun": SEATED_BUN}[style]
+    return [r.translate(table) for r in rows]
 
 
 if __name__ == "__main__":
@@ -384,13 +432,18 @@ if __name__ == "__main__":
     # The host at Andy's: a black suit and tie.
     host = [r.replace("N", "H").replace("W", "M") for r in CHEF]
     host[12] = "...oMMoIIoMMo..."
+    # The bartender at Andy's: brown hair, a burgundy shirt.
+    bartender2 = [r.replace("N", "A").replace("H", "A").replace("S", "s").replace("W", "r") for r in CHEF]
     frames = [check(rows, 16, 24, PALETTE, name) for name, rows in (
         ("auntie", AUNTIE), ("uncle", UNCLE), ("baker", BAKER),
         ("in line", IN_LINE), ("in line 2", IN_LINE_2), ("chef", CHEF), ("chef 2", chef2),
-        *((f"guest {i}", g) for i, g in enumerate(guests)),
-        *((f"guest {i} left", [r[::-1] for r in g]) for i, g in enumerate(guests)),
+        *((f"guest {i}", g) for i, g in enumerate(guests[:4])),
+        *((f"guest {i} left", [r[::-1] for r in g]) for i, g in enumerate(guests[:4])),
         ("bartender", bartender), ("dj", dj),
         ("pianist", PIANIST), ("drummer", DRUMMER), ("singer", SINGER), ("sax", SAX), ("host", host),
+        ("andy's bartender", bartender2),
+        *((f"guest {i}", g) for i, g in enumerate(guests[4:], 4)),
+        *((f"guest {i} left", [r[::-1] for r in g]) for i, g in enumerate(guests[4:], 4)),
     )]
     write_png(os.path.join(root(), "public/sprites/locals.png"), render(frames, PALETTE, 16, 24))
     print(f"Wrote {len(frames)} locals")

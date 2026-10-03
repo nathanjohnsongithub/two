@@ -53,6 +53,8 @@ PALETTE = {
     "=": "#fff3b0",  # bright bulb
     "{": "#eadcc4", "}": "#d8c6a8",  # wallpaper
     "/": "#3b6fb6",  # blue
+    "~": "#f08a5d", ";": "#f7b89a",  # salmon
+    "#": "#23302a",  # nori
     "|": "#232329",  # iron / tires
 }
 
@@ -794,6 +796,12 @@ def box():
     return t.rect(3, 12, 12, 12, "J")
 
 
+def mini_box():
+    """A box as it looks stacked in the back of the U-Haul, in the top left corner
+    (the game places it)."""
+    return Tile().box(0, 0, 7, 6, "j").rect(1, 5, 6, 5, "J").rect(3, 1, 4, 4, "y")
+
+
 def fire_escape():
     t = brick().rect(1, 2, 14, 13, "o")
     return t.where(lambda x, y: 2 <= x <= 13 and 3 <= y <= 12 and not (y % 2 == 0 or x % 4 == 1), "m")
@@ -1139,23 +1147,23 @@ def trash_bags():
 
 
 def cat():
-    """An orange tabby who is supervising."""
+    """A black cat who is supervising."""
     return Tile().art([
         "................",
         "................",
         "................",
         "................",
         "....o...o.......",
-        "...o@o.o@o......",
-        "...o@@o@@o......",
-        "...o@V@V@o......",
-        "...o@@!@@o......",
-        "....o@@@o.......",
-        "....o@$$@o......",
-        "...o@$@@$@o.oo..",
-        "...o@$@@$@o.o@o.",
-        "...o@@@@@@oo@o..",
-        "....oLoooLooo...",
+        "...o|o.o|o......",
+        "...o||o||o......",
+        "...o|Y|Y|o......",
+        "...o||!||o......",
+        "....o|||o.......",
+        "....o|BB|o......",
+        "...o|B||B|o.oo..",
+        "...o|B||B|o.o|o.",
+        "...o||||||oo|o..",
+        "....o|ooo|ooo...",
         "................",
     ])
 
@@ -1323,6 +1331,16 @@ def hinoki(piece, item=None):
         t.art(["oIo.oIo", "oio.oio", "ooo.ooo"], 4, 3).art([".oo.", "oIIo", "oIIo", ".oo."], 11, 1)
     if item == "case":
         t.box(1, 0, 14, 7, "g", edge="z").rect(2, 5, 13, 6, "I").art(["RRr.@@$.!!R"], 3, 4).px(3, 1, "I")
+    if item == "nori":
+        # A stack of nori sheets for the handrolls.
+        t.art(["ooooooo", "o#####o", "o#7#7#o", "o77777o", "ooooooo"], 4 if piece != "front" else 3, 2)
+    if item == "fish":
+        # A little board with a slab of salmon on it.
+        t.box(3, 2, 12, 8, "T").box(4, 3, 10, 6, "~").where(lambda x, y: 5 <= x <= 9 and 4 <= y <= 5 and (x + y) % 3 == 0, ";")
+    if item == "empty":
+        # His spot: an empty plate, his chopsticks laid across it, and his glass.
+        t.art([".oooooo.", "oIIiiIIo", "oIIIIIIo", ".oooooo."], 2, 3).rect(3, 2, 9, 2, "T").rect(4, 1, 10, 1, "t")
+        t.art(["oGo", "ogo", "ooo"], 12, 3)
     if item == "sando":
         t.rect(3, 6, 12, 7, "i").rect(2, 5, 13, 5, "I")
         t.art(["oLLLLLo", "oLL!!Lo", "o!!V!!o", "oLVVLLo", "oLLLLLo"], 4, 0)
@@ -1348,6 +1366,59 @@ def stool():
         "................",
         "................",
     ])
+
+
+def stool_jacket():
+    """His jacket, left draped over the stool next to hers."""
+    return stool().art([
+        "...oooooooooo...",
+        "..oCCCCCCCCCCo..",
+        "..oCcCCCCCCcCo..",
+        "..oCcCCCCCCcCo..",
+        "..ooCCCCCCCCoo..",
+        "..oCco.oo..oo...",
+        "..oCCo..........",
+        "..oCco..........",
+        "..oCCo..........",
+        "...oo...........",
+    ], 0, 3)
+
+
+def prep_island():
+    """The chefs' steel prep table in the middle of the U, two by two: a cutting
+    board with a slab of salmon and a knife, the rice tub with its paddle, a stack
+    of nori and a bowl of pickled ginger."""
+    t = Tile(32, 32)
+    t.box(1, 3, 30, 22, "Z").rect(2, 20, 29, 21, "z")
+    t.box(1, 22, 30, 26, "z").rect(2, 24, 29, 24, "o")
+    for x in (2, 28):
+        t.rect(x, 27, x + 1, 30, "o")
+    t.rect(4, 27, 27, 27, "o")
+    # Cutting board, salmon, knife.
+    t.box(3, 5, 15, 15, "T").where(lambda x, y: 4 <= x <= 14 and 6 <= y <= 14 and (x * 2 + y) % 7 == 0, "t")
+    t.box(5, 7, 11, 11, "~").where(lambda x, y: 6 <= x <= 10 and 8 <= y <= 10 and (x + y) % 3 == 0, ";")
+    t.rect(5, 13, 11, 13, "i").rect(12, 13, 14, 13, "B")
+    # Rice tub (hangiri) and paddle.
+    t.circle(23, 10, 6, "o").circle(23, 10, 5, "T").circle(23, 10, 4, "I").px(21, 9, "i").px(24, 11, "i")
+    t.rect(26, 5, 28, 6, "y").rect(28, 4, 29, 4, "y")
+    # Nori and ginger.
+    t.box(4, 16, 11, 19, "#").rect(5, 17, 10, 17, "7")
+    t.circle(18, 18, 2, "o").circle(18, 18, 1, "!")
+    return t
+
+
+def island_pieces():
+    island = prep_island()
+    pieces = {}
+    for r in range(2):
+        for c in range(2):
+            piece = Tile()
+            piece.g = [row[c * 16:(c + 1) * 16] for row in island.g[r * 16:(r + 1) * 16]]
+            pieces[f"prepIsland_{r}_{c}"] = piece
+    return pieces
+
+
+ISLAND = island_pieces()
 
 
 def andon():
@@ -2747,6 +2818,7 @@ TILES = {
     "dumpsterL": (lambda: dumpster("L"), True),
     "dumpsterR": (lambda: dumpster("R"), True),
     "box": (box, False),
+    "miniBox": (mini_box, False),
     "fireEscape": (fire_escape, True),
     "deck": (deck, False),
     "rail": (rail, True),
@@ -2901,6 +2973,11 @@ TILES = {
     "hinokiFrontSake": (lambda: hinoki("front", "sake"), True),
     "hinokiFrontCase": (lambda: hinoki("front", "case"), True),
     "hinokiSando": (lambda: hinoki("front", "sando"), True),
+    "hinokiEmpty": (lambda: hinoki("front", "empty"), True),
+    "hinokiLNori": (lambda: hinoki("L", "nori"), True),
+    "hinokiRFish": (lambda: hinoki("R", "fish"), True),
+    "hinokiLFish": (lambda: hinoki("L", "fish"), True),
+    "hinokiRNori": (lambda: hinoki("R", "nori"), True),
     "hinokiL": (lambda: hinoki("L"), True),
     "hinokiLRoll": (lambda: hinoki("L", "handroll"), True),
     "hinokiR": (lambda: hinoki("R"), True),
@@ -2910,6 +2987,8 @@ TILES = {
     "stool": (stool, False),
     "andon": (andon, True),
     "prepCounter": (prep_counter, True),
+    "stoolJacket": (stool_jacket, False),
+    **{name: (lambda piece=piece: piece, True) for name, piece in ISLAND.items()},
     # the view from the rooftop, and the DJ
     **{name: (lambda piece=piece: piece, True) for name, piece in VIEW.items()},
     "djBoothL": (lambda: dj_booth("L"), True),
@@ -2989,8 +3068,8 @@ VARIANTS = {
     "garageM": [("garageM", 3), ("garageM2", 1)],
     "boxSign": [("boxSign", 1), ("boxSign2", 1), ("boxSign3", 1)],
     "hinokiFront": [("hinokiFront", 3), ("hinokiFrontRoll", 2), ("hinokiFrontSake", 1), ("hinokiFrontCase", 2)],
-    "hinokiL": [("hinokiL", 2), ("hinokiLRoll", 1)],
-    "hinokiR": [("hinokiR", 2), ("hinokiRSake", 1)],
+    "hinokiL": [("hinokiL", 2), ("hinokiLRoll", 1), ("hinokiLNori", 1), ("hinokiLFish", 1)],
+    "hinokiR": [("hinokiR", 2), ("hinokiRSake", 1), ("hinokiRFish", 1), ("hinokiRNori", 1)],
     "gateBeamM": [("gateBeamM", 1), ("gateBeamM2", 1), ("gateBeamM3", 1)],
     "brickSign": [("brickSign", 1), ("brickSign2", 1), ("brickSign3", 1), ("brickSign4", 1)],
     "car": [("carRed", 3), ("carBlue", 3), ("carWhite", 3), ("carGreen", 1)],

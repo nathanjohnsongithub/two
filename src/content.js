@@ -3,23 +3,28 @@
 
 export const CONFIG = {
   title: "Year Two",
-  subtitle: "Nathan & Hannah",
+  subtitle: " Hannah & Nathan",
   herName: "Hannah",
   noteLabel: "A NOTE FROM NATHAN",
+  // Music for the title screen and the letter (see src/music.js).
+  music: "title",
 };
 
 // Shown on a letter before chapter 1.
 export const PROLOGUE = [
-  "Hannah,",
+  "Hannah!",
+  "Happy two freaking years!",
+  "To celebrate, I made you a little game.",
   "I hid some notes in a few of our favorite memories from this year.",
   "Follow them, and they'll lead you to me.",
-  "- Nathan",
+  "Nathan ♡",
 ];
 
 // Map legend (every row in a map must be the same length):
 //   Floors (walkable) are set per area in `floors`, e.g. { ".": "wood" }
 //   #  wall (tile set by `wall`)   w  window         H  hedge
-//   D  exit door                   P  Hannah starts  N  character (in order from `npcs`)
+//   D  exit door (two side by side make a wide one, if the door has halves)
+//   P  Hannah starts  N  character (in order from `npcs`)
 //   1-9  notes (the number picks the entry in `notes`)
 //   " " empty space outside the map
 //   c counter   k sink    s stove    f fridge    T table     h chair
@@ -47,6 +52,9 @@ export const AREAS = [
     chapter: "Chapter 1",
     name: "Valentine's Day",
     background: "#1a1420",
+    // Evening: the apartment dims to blue, and the candles, the lamps and
+    // dinner on the stove glow through it. [red, green, blue, strength]
+    tint: [12, 10, 44, 0.6],
     wall: "wall",
     door: "door",
     floors: {
@@ -60,7 +68,10 @@ export const AREAS = [
       m: "menuBoard", M: "desk", a: "deskChair", R: "dresser", g: "bookshelf", i: "floorLamp",
       J: "coffeeTable", V: "vanity", q: "shower", z: "trashCan", y: "coatRack",
     },
-    intro: ["February 14th. 1055 W Pratt, apartment 2A.", "Something smells amazing... but where's Nathan?"],
+    // The song that plays in this chapter: a name from src/music.js, or a
+    // path to an audio file in public/ (like "/music/our-song.mp3").
+    music: "valentine",
+    intro: ["February 14th. 1055 W Pratt, apartment 2A.", "Also known as the Pratt House.","Something smells amazing... but where's Nathan?"],
     // Right after the intro, she catches Nathan slipping away: he walks this
     // path of [column, row] map tiles (counted from 0), fades out at the end,
     // and then she says `lines`. `carry` puts a tile over his head.
@@ -73,38 +84,33 @@ export const AREAS = [
       "#p.gg...p#RBBjMp#pM.jBBR#tVu#pRjBBM#",
       "#........#.bb.a.#.a..bb.#___#...bba#",
       "w..hXh...#.;;;..#...\"\"\".#___#..;;;.#",
-      "w...''...#.;;;1.#...\"\"\".###.#..;3;.#",
+      "w...''...#.;;;1.#...\"\"\".###.#..;2;.#",
       "#....''..#.;;;..#...\"\"\".##..#..;;;.#",
       "#.....'..#......#.......##.........#",
       "w......'.####.####.#######..########",
       "w.i(C).'......''.....''......fccOck#",
       "#.(:::..''''''.'''''''.''''....\"\"\"c#",
-      "#.C:J:.m..P##########.###..'''....c#",
-      "w.):::..y#D#      #tV__q#.........z#",
-      "wp..v....#        #_2__q#ccc.......#",
-      "##########       ############D##ww##",
+      "#.C:J:....P##########.###..'''....c#",
+      "w.):::...#D#      #tV__q#.........z#",
+      "wp..v....#        #____q#ccc.......#",
+      "##########        ###########D##ww##",
     ],
     notes: [
       {
         title: "Apartment 2A",
-        caption: "My old place on Pratt, a block from the lake. The kitchen was small, but it worked.",
-        photo: null,
+        caption: "The Pratt house right off the lake and just a block away from my LOMLs place. So many amazing memories here including the one from this night",
+        photo: "photos/chapter_1/76449857-D54C-473D-AFD2-C3C7A7BA7895_1_105_c.jpeg",
       },
       {
         title: "Valentine's Day",
-        caption: "I wanted to cook you something fancy, so I turned my apartment into a restaurant for the night.",
-        photo: null,
-      },
-      {
-        title: "The menu",
-        caption: "Carbonara (your favorite), steak, and a warm sticky date cake with ice cream on top.",
-        photo: null,
+        caption: "I wanted to cook something special for you, and I figured cooking some of your favorite dishes would be the best way to do that.",
+        photo: "photos/chapter_1/altoids.jpeg",
       },
     ],
     npcs: [],
     // One-time lines when she walks up to a tile.
     details: {
-      O: ["Carbonara in the pot, steak in the pan. It's all still warm.", "Nathan was just here..."],
+      O: ["Carbonara boiling in the water, Steak searing in the pan. It's all still warm."],
     },
     // Walking up to this tile once every note is found plays the goal, then
     // the exit opens.
@@ -113,13 +119,12 @@ export const AREAS = [
       locked: ["The table is set for two... but Nathan isn't here. Maybe look around first."],
       lines: ["The table is set for two. The candles are still lit.", "No Nathan... but he left the menu."],
       cards: [
-        { label: "FIRST COURSE", title: "Carbonara", caption: "Your favorite.", photo: null },
-        { label: "MAIN COURSE", title: "Steak", caption: "Cooked just right (I hope).", photo: null },
+        { label: "MAIN COURSE", title: "Steak & Carbonara", caption: "Cooked almost as good as the one in Ohio.", photo: "public/photos/chapter_1/carbonara-steak.jpeg" },
         {
           label: "DESSERT",
           title: "Sticky date cake",
-          caption: "Warm, with ice cream melting on top.",
-          photo: null,
+          caption: "Warm, with that ice cream melting on top. Almost as good as Trivoli Taverns",
+          photo: "public/photos/chapter_1/stick_date_cake_finished.jpeg",
         },
       ],
       end: ["Dinner's still warm. He can't have gone far.", "(The front door is open.)"],
@@ -134,7 +139,7 @@ export const AREAS = [
     floors: { ":": "sidewalk", ";": "road", "-": "roadLine", "=": "crosswalk", _: "terracotta", ",": "pavers" },
     // Characters for this chapter only.
     objects: {
-      // Canal Street: taxis both ways.
+      // Parked taxis, if you want any (the ones driving are in `traffic`).
       A: "taxi", a: "taxiEast",
       // The Chinatown gate: a green tile roof (Q) over a signboard (q), on two red pillars (!),
       // with a stone lion on each side (< >).
@@ -153,7 +158,34 @@ export const AREAS = [
       // The park: xiangqi tables. And tables on the dumpling house patio.
       c: "chessTable", t: "table",
     },
+    music: "chinatown",
     intro: ["Chinatown, New York City.", "Nathan has to be around here somewhere."],
+    // Canal Street: taxis both ways along these map rows. They stop for her at
+    // the crosswalk (or anywhere else she steps out).
+    traffic: [
+      { row: 4, car: "taxi" },
+      { row: 6, car: "taxiEast" },
+    ],
+    // The crowd: `look` picks who (a row in tools/crowd_sprite.py). Each walks
+    // their `path` of [column, row] tiles and back (or round, with `loop`), or
+    // stands `at` a tile facing `face`. Add `lines` and they'll say something
+    // when she walks up.
+    people: [
+      { look: 2, path: [[3, 7], [19, 7]] },
+      { look: 4, path: [[12, 7], [12, 14], [20, 14]] },
+      { look: 0, path: [[1, 14], [22, 14]] },
+      { look: 1, path: [[22, 22], [2, 22]] },
+      { look: 3, at: [7, 19], face: "up" },
+      { look: 5, path: [[1, 31], [10, 31], [10, 34], [1, 34]], loop: true },
+      { look: 15, path: [[9, 3], [16, 3]] },
+      { look: 16, path: [[11, 13], [11, 22]] },
+      { look: 17, path: [[7, 21], [7, 31]] },
+      { look: 18, at: [17, 20], face: "up", lines: ["These lychees are a steal.", "Don't tell the auntie I said that."] },
+      { look: 19, path: [[13, 34], [21, 34]] },
+      { look: 20, at: [9, 31], face: "up" },
+    ],
+    // A few pigeons pecking around each of these tiles. They scatter when she gets close.
+    pigeons: [[16, 14], [7, 22], [6, 32]],
     // Past the gate, ducking down the alley toward Pell St.
     glimpse: {
       path: [[13, 13], [13, 14], [10, 14], [10, 18]],
@@ -164,9 +196,9 @@ export const AREAS = [
       "#I#kFF#wWwWWwWwoOOo#IkI#",
       "#RKMJTBRMHJBRKJTMBRJKHB#",
       "::g::f::b:::P::::g::f:::",
-      ";;;AA;;;;;====;;;;;;;;;;",
+      ";;;;;;;;;;====;;;;;;;;;;",
       "----------====----------",
-      ";;;;;;;;;;====;;;;aa;;;;",
+      ";;;;;;;;;;====;;;;;;;;;;",
       "::e:::::::::::::::::e:::",
       "#OoOFF#kQQQQQQQQI#IwWWw#",
       "#OoOFF#kqqqqqqqqIkIwWWw#",
@@ -199,7 +231,7 @@ export const AREAS = [
       "########################",
     ],
     notes: [
-      { title: "Chinatown", caption: "We kept finding our way back here.", photo: null },
+      { title: "Chinatown", caption: "It's somehow always asian, Also look at how cute we look.", photo: "public/photos/chapter_2/chinatown_selfie.jpeg" },
     ],
     // The auntie at the fruit stand and the uncle at the xiangqi tables
     // (tools/local_sprite.py). She has to talk to both before the dumpling plate.
@@ -230,7 +262,7 @@ export const AREAS = [
       lines: [
         "An empty plate. Just crumbs and a pair of chopsticks.",
         "There's a note tucked under it:",
-        "\"Sorry. I ate all the dumplings. By accident. -N\"",
+        "\"Sorry. My big old fatass ate all the dumplings while you were filming some HanEatsYumYum content. -Nathan\"",
         "He was definitely here.",
       ],
       cards: [],
@@ -249,13 +281,35 @@ export const AREAS = [
     // Characters for this chapter only.
     objects: {
       e: "lamppostBanner", m: "stoneBanner", h: "foldingChair", "!": "podium", b: "balloons",
+      // A ceremony chair with someone's family in it (they come from `npcs`).
+      a: "foldingChair",
       s: "loyolaSign", q: "waterSail",
       // Madonna della Strada: copper roof with a cross, stained glass, a rose window.
       c: "roofCopper", "+": "roofCross", g: "chapelWindow", O: "roseWindow",
       // The dome on the main hall's roof.
       u: "dome",
     },
-    intro: ["Loyola, Lake Shore Campus. Graduation day!", "Nathan has to be here somewhere... right?"],
+    music: "graduation",
+    intro: ["Loyola's Campus, Rogers Park. Graduation day!", "Nathan has to be here somewhere... right?"],
+    // In his cap and gown, off into the chapel.
+    glimpse: {
+      sprite: "nathan_gown",
+      path: [[9, 10], [9, 19], [14, 19], [14, 15]],
+      lines: ["Was that Nathan, in his cap and gown?", "Everyone looks the same in these... but I'd know that walk anywhere."],
+    },
+    // Classmates in their gowns wandering the quad, and families.
+    people: [
+      { look: 6, path: [[2, 30], [17, 30]] },
+      { look: 7, path: [[1, 23], [17, 23]] },
+      { look: 8, path: [[18, 5], [18, 31]] },
+      { look: 9, at: [3, 15], face: "right" },
+      { look: 10, at: [4, 15], face: "left", lines: ["Congratulations, graduate!"] },
+      { look: 11, at: [14, 22], face: "left" },
+      { look: 21, path: [[8, 6], [8, 32]] },
+      { look: 22, at: [13, 27], face: "left" },
+      { look: 23, at: [12, 27], face: "right", lines: ["Smile! ...One more!", "...Okay, one more."] },
+      { look: 24, path: [[1, 19], [17, 19]] },
+    ],
     map: [
       "^^^^^^^^uu^^^^^^^^^~~~",
       "^^^^^^^^^^^^^^^^^^^~~~",
@@ -281,20 +335,20 @@ export const AREAS = [
       "Hb;;;!;;,,........,~~~",
       "H.;;;;;;,,.Y....Y.,~~~",
       "H.......,,........,~~~",
-      "H.hhhhhh,,........,~~~",
+      "H.aahhah,,........,~~~",
       "H.......,,.......N,~~~",
-      "H.hhhGhh,,..Y.....,~~~",
+      "H.hahGha,,..Y.....,~~~",
       "H.......,,e.......,~~~",
-      "H.hhhhhh,,........,~~~",
+      "H.hhaahh,,........,~~~",
       "H.......,,.....Y..,~~~",
       "H.......,,........,~~~",
       "H.......,,........,~~~",
-      "##W#W####D###W#W#W#~~~",
+      "##W#W###DD###W#W#W#~~~",
       "###################~~~",
     ],
     notes: [
-      { title: "We did it", caption: "Two Loyola graduates. I'm so proud of you.", photo: null },
-      { title: "The lake", caption: "Of all the campuses in Chicago, ours had Lake Michigan right there.", photo: null },
+      { title: "We did it", caption: "Two Loyola graduates look as us go", photo: "public/photos/chapter_3/h_and_n_grad_photo.JPG" },
+      { title: "The lake", caption: "Some would say the only redeming quality about this school", photo: "public/photos/chapter_3/the_lake.jpeg" },
     ],
     // Classmates in cap and gown (frame picks the look in tools/grad_sprite.py).
     // She has to talk to all three before the cap on the chair.
@@ -321,8 +375,16 @@ export const AREAS = [
         hint: "Micheal down by the lake",
         sprite: "grads",
         frame: 2,
-        lines: ["Everyone's wearing the same gown. Good luck finding anyone in this crowd."],
+        lines: ["Yo Hannah Congrats!", "Where's Nathan?", "He's probably working on some important AI club business right now I'm not sure where hes at."],
       },
+      // Families in the ceremony chairs ("a"), in map order (frames in tools/seated_sprite.py).
+      { at: "a", sprite: "seated", frame: 0, lines: [] },
+      { at: "a", sprite: "seated", frame: 1, lines: [] },
+      { at: "a", sprite: "seated", frame: 2, lines: [] },
+      { at: "a", sprite: "seated", frame: 3, lines: [] },
+      { at: "a", sprite: "seated", frame: 4, lines: [] },
+      { at: "a", sprite: "seated", frame: 5, lines: [] },
+      { at: "a", sprite: "seated", frame: 15, lines: [] },
     ],
     goal: {
       tile: "G",
@@ -332,7 +394,7 @@ export const AREAS = [
       lines: [
         "A graduation cap, left on a chair. The tassel's already turned.",
         "There's a note tucked inside:",
-        "\"Congrats, graduate. So proud of you. Keep looking. -N\"",
+        "\"Congrats, Hannah! I'm so proud of you <3 Keep looking I'm still not here -Nathan\"",
         "Of course he's not here.",
       ],
       cards: [],
@@ -362,15 +424,20 @@ export const AREAS = [
       B: "cartBlue", K: "cartBlack", t: "trashBags", m: "mattress", k: "cat",
       e: "pole", w: "wires", A: "car", i: "cone",
     },
-    intro: ["Moving day. Goodbye, Rogers Park.", "Carry every box to the U-Haul."],
+    music: "moving",
+    intro: ["Moving day. Goodbye, Rogers Park thank god!", "Carry every box to the U-Haul."],
     // Off down the alley with one box, leaving her the rest.
     glimpse: {
       path: [[18, 6], [18, 7], [39, 7]],
       carry: "box",
-      lines: ["Was that Nathan, carrying ONE box?", "...Guess the rest are up to me."],
+      lines: ["Was that Nathan, carrying only ONE box?","Bum", "...Guess the rest are up to me."],
     },
+    // A neighbor out for a walk down the alley.
+    people: [
+      { look: 25, path: [[1, 7], [38, 7]], lines: ["Moving out? Good luck with all that.", "I'd help, but I just got back from the gym."] },
+    ],
     details: {
-      k: ["A stray cat. It watches you carry boxes.", "It does not offer to help."],
+      k: ["A stray cat. It watches you carry boxes.", "Kind of like that one we saw almost two years ago off the pier.", "It does not offer to help.", "Hater ass cat."],
     },
     map: [
       "dFF#I#|uWuud#I#I#d|#FF#I#uuWuuWu|d#I#FF#",
@@ -389,7 +456,7 @@ export const AREAS = [
       ",,Y,,,,,,,,,,,,Y,,,,,,,,,,,,,,,,,,,,,Y,,",
       ",,,***,,,,,,,,,,,,,,Y,,,***,,,,Y,,,,,,,,",
     ],
-    notes: [{ title: "Moving day", caption: "Goodbye Rogers Park, hello Lakeview.", photo: null }],
+    notes: [{ title: "Moving day", caption: "Goodbye Rogers Park, Hello Lakeview! Also what TF was Ethans shirt", photo: "public/photos/chapter_4/the_move.jpeg" }],
     npcs: [],
     goal: {
       tile: "U",
@@ -405,6 +472,8 @@ export const AREAS = [
     chapter: "Chapter 5 · Morning",
     name: "Decker's Bagels",
     background: "#1a1420",
+    // Golden morning light.
+    tint: [255, 170, 60, 0.17],
     wall: "brick",
     floors: { ":": "sidewalk", ";": "road", "-": "roadLine", "=": "crosswalk" },
     // Characters for this chapter only: the pop-up's sign (three wide) over its
@@ -414,20 +483,34 @@ export const AREAS = [
       S: "deckerSign", "(": "popupWindowL", w: "popupWindowM", ")": "popupWindowR",
       X: "pickupTable", m: "bagelMenu", k: "bikeRack", F: "fireEscapeFront", A: "taxi", a: "taxiEast",
     },
+    music: "morning",
     intro: ["The last date before your new job.", "First stop: Decker's Bagels."],
     // Leaving the pickup table, grinning.
     glimpse: {
       path: [[10, 5], [13, 5], [13, 6], [15, 6]],
       lines: ["Hold on... was that Nathan, grinning about something?", "Gone again."],
     },
+    // The line at the window, facing it. They turn around to talk.
+    people: [
+      { look: 14, at: [6, 4], face: "up" },
+      { look: 12, at: [6, 5], face: "up", lines: ["Worth the wait. Trust me."] },
+      {
+        look: 13,
+        at: [6, 6],
+        face: "up",
+        lines: ["Somebody just ordered two sandwiches and took off grinning.", "Said something about dinner plans?"],
+      },
+      // A jogger on the sidewalk.
+      { look: 26, path: [[2, 8], [13, 8]], speed: 48 },
+    ],
     map: [
       "##II###II###II##",
       "##II###II###II##",
       "######SSS#######",
       "##I###(w)###I###",
       ":m:::::::X:::k::",
-      "::Y::N::::::::Y:",
-      "::::N:::::1:::::",
+      "::Y:::::::::::Y:",
+      "::::::::::1:::::",
       ":hTh:::::::hTh::",
       ":e::::::::::::e:",
       ";;AA;;====;;;;;;",
@@ -440,16 +523,9 @@ export const AREAS = [
     notes: [
       { title: "Decker's", caption: "Sourdough bagels from a pop-up window. The last date before your first day started here.", photo: null },
     ],
-    // Two people in line (no names, so no tags over their heads), and the
-    // worker leaning out of the window (`at` puts her in the window tile
+    // The worker leaning out of the window (`at` puts her in the window tile
     // instead of on an N).
     npcs: [
-      { sprite: "locals", frame: 3, lines: ["Worth the wait. Trust me."] },
-      {
-        sprite: "locals",
-        frame: 4,
-        lines: ["Somebody just ordered two sandwiches and took off grinning.", "Said something about dinner plans?"],
-      },
       {
         name: "Decker's",
         sprite: "locals",
@@ -484,30 +560,35 @@ export const AREAS = [
     // Low light: a dim, warm tint, with the lanterns and lit signs glowing through it.
     tint: [28, 14, 8, 0.45],
     wall: "slatWall",
-    floors: { ".": "woodDark", ",": "slate" },
+    floors: { ".": "woodDark", ",": "slate", a: "woodDark", b: "woodDark", y: "woodDark", z: "woodDark" },
     // Characters for this chapter only: sake shelves and lit box signs on the
     // slat walls, noren curtains in the doorways, the chefs' back counter (c),
     // the U-shaped hinoki counter ([ and ] are its arms, = its front, { and }
-    // the corners, G your saved spot), stools, standing lit signs, lanterns.
+    // the corners, G your saved spot, E his: an empty plate), stools, standing
+    // lit signs, lanterns, and the chefs' steel prep table (I, two by two).
+    // Diners: "u" is a stool someone's sitting on, facing the counter; "a" and
+    // "b" are diners on the arms' stools facing right and left, "y" and "z"
+    // at a table (the people come from `npcs`). "j" is his jacket on his stool.
     objects: {
       K: "sakeShelf", L: "boxSign", n: "noren", c: "prepCounter",
       "[": "hinokiL", "]": "hinokiR", "=": "hinokiFront", "{": "hinokiBL", "}": "hinokiBR", G: "hinokiSando",
-      o: "stool", A: "andon", l: "lantern",
+      E: "hinokiEmpty", o: "stool", u: "stool", j: "stoolJacket", A: "andon", l: "lantern", I: "prepIsland",
     },
+    music: "yokocho",
     intro: ["Dinner at Yokocho, in the West Loop.", "Handrolls at the counter... and hopefully Nathan."],
     map: [
       "#KK#L##n##L#KK##",
       "#...[cccccc]...#",
       "#.l.[,,,,,,].l.#",
-      "#..o[N,,,,,]o..#",
+      "#..a[N,,,,,]b..#",
+      "#...[,,II,,]...#",
+      "#..a[,,II,N]b..#",
       "#...[,,,,,,]...#",
-      "#..o[,,,,,N]o..#",
-      "#...[,,,,,,]...#",
-      "#..o[,,,,,,]o..#",
-      "#.l.{==G===}.l.#",
-      "#....o.o.o.....#",
+      "#..a[,,,,,,]b..#",
+      "#.l.{==GE==}.l.#",
+      "#....u.oj.u....#",
       "#..............#",
-      "#A.hTh....hTh.A#",
+      "#A.yTz....hTh.A#",
       "#......l.......#",
       "#..1...........#",
       "#......P.......#",
@@ -532,7 +613,28 @@ export const AREAS = [
         reach: 36,
         lines: ["Handrolls go straight from my hands to yours.", "Eat them right away, while the nori's still crisp."],
       },
+      // Diners, in map order (frames in tools/seated_sprite.py): on the left
+      // arm facing right, the right arm facing left, then the front.
+      { at: "a", sprite: "seated", frame: 9, lines: [] },
+      { at: "a", sprite: "seated", frame: 10, lines: [] },
+      { at: "a", sprite: "seated", frame: 11, lines: [] },
+      { at: "b", sprite: "seated", frame: 16, lines: ["Try the scallop one. Trust me."] },
+      { at: "b", sprite: "seated", frame: 17, lines: [] },
+      { at: "b", sprite: "seated", frame: 18, lines: [] },
+      {
+        at: "u",
+        sprite: "seated",
+        frame: 6,
+        lines: ["Are those two seats yours?", "Someone left a jacket on one to hold them. Very serious about it."],
+      },
+      { at: "u", sprite: "seated", frame: 7, lines: [] },
+      // A couple at a table (tools/local_sprite.py).
+      { at: "y", sprite: "locals", frame: 36, lines: [] },
+      { at: "z", sprite: "locals", frame: 52, lines: [] },
     ],
+    details: {
+      j: ["His jacket, on the stool next to yours.", "He can't have gone far."],
+    },
     goal: {
       tile: "G",
       locked: ["Your seat's saved... but there's still a note around here somewhere."],
@@ -554,50 +656,57 @@ export const AREAS = [
     // Characters for this chapter only: the view (V, a 14x4 block: the
     // skyline with Willis, Marina City, Trump, Wrigley, Aon and the Hancock),
     // city lights far below the railings, the bar, candlelit cafe tables,
-    // patio heaters, and the DJ's booth (Q, two wide) between two speakers.
+    // patio heaters, and the DJ's booth (Q, two wide) between two speakers,
+    // by the railing to the left of your table.
     // People sit at the tables: "a" is a seat on the left of a table, "b" on
     // the right, "m" is behind the bar, "d" behind the decks (they're all
     // deck underneath; the people come from `npcs`).
     floors: { ".": "deck", a: "deck", b: "deck", m: "deck", d: "deck" },
     objects: { V: "view", k: "cityLights", c: "bar", T: "bistroTable", H: "heater", Q: "djBooth", Z: "speaker" },
+    music: "rooftop",
     intro: ["The rooftop of the Carbide & Carbon Building.", "Drinks after dinner, to celebrate your new job."],
+    // Right after the intro, the camera finds him at the railing. He turns
+    // around, and she says `lines`.
+    reveal: { lines: ["...Nathan?", "He's really here."] },
     map: [
       "VVVVVVVVVVVVVV",
       "VVVVVVVVVVVVVV",
       "VVVVVVVVVVVVVV",
       "VVVVVVVVVVVVVV",
       "krrrrrrrrrrrrk",
-      "krp..hXN...prk",
-      "kr..........rk",
+      "krp.d..hXN.prk",
+      "krZQQZ......rk",
       "kroooooooooork",
       "kr.aTb..aTb.rk",
       "kr....H.....rk",
       "kr.aTb...Tb.rk",
       "kroooooooooork",
-      "kr......1...rk",
-      "kr..d.H..m.2rk",
-      "krZQQZ..cccprk",
+      "kr..........rk",
+      "kr....H..m..rk",
+      "krp.....cccprk",
       "kr....P.....rk",
       "######EE######",
       "##############",
     ],
-    notes: [
-      { title: "Chateau Carbide", caption: "Green and gold, the whole city lit up around us.", photo: null },
-      { title: "Your new job", caption: "We came up here to celebrate before your first day. I'm so proud of you.", photo: null },
-    ],
+    // No notes here: she has to talk to the DJ and the bartender before him.
+    notes: [],
     npcs: [
-      { name: "Nathan", sprite: "nathan", lines: [] },
-      // Guests at the tables, in map order: frames 7-10 face right (seats "a"),
-      // 11-14 face left (seats "b"). Guests with no lines just enjoy the view.
+      // Looking out at the view (frame 3: facing up).
+      { name: "Nathan", sprite: "nathan", frame: 3, lines: [] },
+      // Guests at the tables, in map order: seats "a" face right, "b" face
+      // left (frames in tools/local_sprite.py; everyone's a different person).
+      // Guests with no lines just enjoy the view.
       { at: "a", sprite: "locals", frame: 7, lines: ["Cheers! We're celebrating too."] },
       { at: "a", sprite: "locals", frame: 8, lines: [] },
       { at: "a", sprite: "locals", frame: 10, lines: ["You can see the whole river from up here."] },
-      { at: "b", sprite: "locals", frame: 12, lines: [] },
-      { at: "b", sprite: "locals", frame: 13, lines: ["That guy by the railing keeps checking the elevator.", "Friend of yours?"] },
-      { at: "b", sprite: "locals", frame: 14, lines: [] },
-      { at: "b", sprite: "locals", frame: 11, lines: ["Best seat in the city."] },
+      { at: "b", sprite: "locals", frame: 13, lines: [] },
+      { at: "b", sprite: "locals", frame: 38, lines: ["That guy by the railing keeps checking the elevator.", "Friend of yours?"] },
+      { at: "b", sprite: "locals", frame: 39, lines: [] },
+      { at: "b", sprite: "locals", frame: 40, lines: ["Best seat in the city."] },
       {
         name: "DJ",
+        required: true,
+        hint: "the DJ",
         at: "d",
         sprite: "locals",
         frame: 16,
@@ -606,6 +715,8 @@ export const AREAS = [
       },
       {
         name: "Bartender",
+        required: true,
+        hint: "the bartender",
         at: "m",
         sprite: "locals",
         frame: 15,
@@ -613,22 +724,29 @@ export const AREAS = [
         lines: ["What can I get you?", "Oh, you're Hannah. Your drink's already waiting at his table."],
       },
     ],
-    // The goal here is Nathan himself.
+    // The goal here is Nathan himself. With `view`, she walks up beside him,
+    // they face each other for the `lines`, then both turn to look out at the
+    // skyline for the `end`.
     goal: {
       tile: "N",
+      view: true,
       speaker: "Nathan",
-      locked: ["Not yet! Read the rest of my notes first."],
+      locked: ["Not yet!"],
+      // Until she's talked to the DJ and the bartender. {who} is whoever's left.
+      lockedTalk: ["Not yet! Go say hi to {who} first."],
       lines: [
         "You found me.",
         "Sorry for making you chase me through our whole year.",
         "Every note was leading you here.",
+      ],
+      cards: [],
+      end: [
         "Happy anniversary, Hannah.",
         "But I have one more gift for you.",
         "This one isn't a memory yet. It's for the future.",
         "Come on. I'll show you.",
       ],
-      cards: [],
-      end: [],
+      endSpeaker: "Nathan",
       advance: true,
       // Fade to black on the way to the jazz club.
       fade: true,
@@ -639,7 +757,10 @@ export const AREAS = [
     chapter: "Someday soon",
     name: "Andy's Jazz Club",
     background: "#1a1420",
-    tint: [30, 10, 14, 0.45],
+    // The house lights down low...
+    tint: [22, 8, 12, 0.58],
+    // ...and a spotlight on the singer ([column, row]).
+    spotlights: [[9, 2]],
     wall: "brick",
     // Nathan walks in with her this time, a step behind.
     companion: { sprite: "nathan" },
@@ -655,19 +776,21 @@ export const AREAS = [
       K: "backBar", c: "clubBar", o: "stool", C: "curtain", A: "andysSign", F: "jazzPhoto", J: "sconce",
       p: "piano", q: "drums", T: "jazzTable", Y: "reservedTable", h: "hostStand", g: "plant", E: "door",
     },
+    // The band's playing.
+    music: "andys",
     intro: ["Andy's Jazz Club, downtown.", "The band's already playing."],
     map: [
       "#KKKKFCCAACCJFJ#",
       "#_m__.,pp,q,...#",
-      "#cccc.,i,v,v,..#",
-      "#oooo..........#",
+      "#cccc.,i,v,v...#",
+      "#oooo.,,,,,,...#",
       "#.......Y......#",
       "#.aTb.......aTb#",
       "#g.............#",
       "#.aTb..aTb.....#",
-      "#.............g#",
-      "#.aTb.......N..#",
-      "#...........h..#",
+      "#...........N.g#",
+      "#.aTb.......h..#",
+      "#..............#",
       "#..........P..g#",
       "###########E####",
     ],
@@ -677,7 +800,7 @@ export const AREAS = [
         name: "Host",
         sprite: "locals",
         frame: 21,
-        reach: 40,
+        reach: 34,
         lines: ["Welcome to Andy's!", "Reservation for two? Right this way.", "Your table's up front, right by the stage."],
       },
       // The band. They're busy playing, except the singer.
@@ -685,15 +808,19 @@ export const AREAS = [
       { at: "q", sprite: "locals", frame: 18, sway: true, lines: [] },
       { name: "Singer", at: "v", sprite: "locals", frame: 19, sway: true, reach: 30, lines: ["Welcome in, you two.", "This next one's a slow one."] },
       { at: "v", sprite: "locals", frame: 20, sway: true, lines: [] },
-      { name: "Bartender", at: "m", sprite: "locals", frame: 15, reach: 34, lines: ["What can I get you two?", "Grab your table first. The set's already started."] },
-      // Guests at the tables, in map order: frames 7-10 face right (seats "a"),
-      // 11-14 face left (seats "b").
-      { at: "a", sprite: "locals", frame: 8, lines: ["First time at Andy's? You're in for a treat."] },
-      { at: "a", sprite: "locals", frame: 9, lines: [] },
-      { at: "a", sprite: "locals", frame: 10, lines: [] },
-      { at: "b", sprite: "locals", frame: 11, lines: ["Shh... the sax solo's coming up."] },
-      { at: "b", sprite: "locals", frame: 13, lines: [] },
-      { at: "b", sprite: "locals", frame: 14, lines: ["You two look like you're celebrating."] },
+      { name: "Bartender", at: "m", sprite: "locals", frame: 22, reach: 34, lines: ["What can I get you two?", "Grab your table first. The set's already started."] },
+      // Guests at the tables, in map order: seats "a" face right, "b" face
+      // left (different people from the rooftop's).
+      { at: "a", sprite: "locals", frame: 26, lines: ["First time at Andy's? You're in for a treat."] },
+      { at: "a", sprite: "locals", frame: 27, lines: [] },
+      { at: "a", sprite: "locals", frame: 28, lines: [] },
+      { at: "a", sprite: "locals", frame: 29, lines: ["I come here every chance I get."] },
+      { at: "a", sprite: "locals", frame: 30, lines: [] },
+      { at: "b", sprite: "locals", frame: 46, lines: ["Shh... the sax solo's coming up."] },
+      { at: "b", sprite: "locals", frame: 47, lines: [] },
+      { at: "b", sprite: "locals", frame: 48, lines: ["You two look like you're celebrating."] },
+      { at: "b", sprite: "locals", frame: 49, lines: [] },
+      { at: "b", sprite: "locals", frame: 50, lines: [] },
     ],
     // The goal is the reserved table: they sit down across from each other,
     // and he gives her the tickets.
@@ -707,11 +834,11 @@ export const AREAS = [
         label: "ONE MORE GIFT",
         admit: "ADMIT TWO",
         venue: "Andy's Jazz Club",
-        detail: "Live jazz · Downtown Chicago",
+        detail: "Live jazz · River North",
         // TODO: the real date and time of the show.
-        date: "DATE · TIME",
-        stub: "Seat: next to me",
-        caption: "A real night out, just the two of us. It's a date.",
+        date: "Friday October 23rd · 7:45 PM",
+        stub: "Seat: next to me 😼",
+        caption: "",
       },
       end: ["I can't wait.", "Here's to year three, Hannah."],
       endSpeaker: "Nathan",
@@ -722,6 +849,7 @@ export const AREAS = [
 ];
 
 export const ENDING = {
+  music: "title",
   signoff: "Happy anniversary, Hannah. ♥",
   closing: "Love, Nathan",
 };

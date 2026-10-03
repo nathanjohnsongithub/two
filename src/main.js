@@ -1,7 +1,8 @@
 import { k } from "./kaplay.js";
 import { AREAS, CONFIG, ENDING, PROLOGUE } from "./content.js";
 import { FULL, OVERHEAD, SOLID, TILE_COLS, TILE_NAMES, VARIANTS } from "./tileset.js";
-import { COLORS, ui, say, showMemory, showTicket, hearts, titleCard, fadeOut } from "./ui.js";
+import { COLORS, ui, say, showMemory, showTicket, hearts, titleCard, fadeOut, muteButton, overMute, photoOverlay, squareCrop } from "./ui.js";
+import { playMusic, preloadMusic, sfx, unlockAudio } from "./audio.js";
 import { loadProgress, saveProgress } from "./save.js";
 
 const TILE = 16;
@@ -29,8 +30,31 @@ k.loadFont("pixel", "/fonts/Jersey10.ttf", { size: 10 });
 k.loadSprite("hannah", "/sprites/hannah.png", WALK);
 k.loadSprite("hannah_gown", "/sprites/hannah_gown.png", WALK);
 k.loadSprite("nathan", "/sprites/nathan.png", WALK);
+k.loadSprite("nathan_gown", "/sprites/nathan_gown.png", WALK);
 k.loadSprite("grads", "/sprites/grads.png", { sliceX: 3 });
-k.loadSprite("locals", "/sprites/locals.png", { sliceX: 22 });
+k.loadSprite("locals", "/sprites/locals.png", { sliceX: 53 });
+// People sitting down (tools/seated_sprite.py), 16x40 so their chair lines up with the map's.
+k.loadSprite("seated", "/sprites/seated.png", { sliceX: 19 });
+// Pigeons and the stray cat (tools/critter_sprite.py).
+k.loadSprite("critters", "/sprites/critters.png", { sliceX: 10 });
+// The crowd (tools/crowd_sprite.py): one person per row, each with Hannah's
+// 12-frame walk. Their animations are named "<look>-<direction>-<walk|idle>".
+const crowdLoaded = new Promise((resolve, reject) => {
+  const img = new Image();
+  img.onload = () => {
+    const looks = img.height / 24;
+    const anims = {};
+    for (let look = 0; look < looks; look++) {
+      for (const [name, anim] of Object.entries(WALK.anims)) {
+        const shift = (f) => look * 12 + f;
+        anims[`${look}-${name}`] = typeof anim === "number" ? shift(anim) : { ...anim, frames: anim.frames.map(shift) };
+      }
+    }
+    resolve(k.loadSprite("crowd", img, { sliceX: 12, sliceY: looks, anims }));
+  };
+  img.onerror = reject;
+  img.src = "/sprites/crowd.png";
+});
 // tiles.png is a grid, TILE_COLS tiles across.
 k.loadSprite("tiles", "/sprites/tiles.png", { sliceX: TILE_COLS, sliceY: Math.ceil(TILE_NAMES.length / TILE_COLS) });
 const tileFrame = (name) => TILE_NAMES.indexOf(name);
@@ -75,6 +99,10 @@ const SIDES = [["N", -1, 0], ["S", 1, 0], ["E", 0, 1], ["W", 0, -1]];
 const GLOWS = {
   bulbs: [[-4, -2, 3.5], [4, -2, 3.5]],
   tableCandle: [[0, -2, 7]],
+  floorLamp: [[0, -6, 10]],
+  desk: [[5, -5, 7]],
+  nightstand: [[0, -4, 7]],
+  stovePot: [[0, 0, 7]],
   lantern: [[0, 1, 8]],
   boxSign: [[0, 0, 9]],
   andon: [[0, -1, 8]],
@@ -101,6 +129,16 @@ function addGlows(object, center) {
 
 // Where music notes drift up from: the DJ's decks, and the band at Andy's.
 const MUSIC = new Set(["djBoothR", "drums", "pianoR"]);
+
+// Things that steam: dinner on the stove, the bag of bagels. [x, y] from the
+// tile's center, how far the puffs spread, and how often one rises.
+const STEAM = {
+  stovePot: { at: [0, -3], spread: 6, every: 0.3 },
+  pickupTable: { at: [0, -9], spread: 3, every: 0.5 },
+};
+
+// Map tiles that come alive instead of being painted into the map (the stray cat).
+const LIVE = new Set(["cat"]);
 
 // Which way someone walking in `dir` faces. Only turn to a new axis when
 // clearly heading that way: walking at a diagonal otherwise flips between two
@@ -134,7 +172,9 @@ function layout(area) {
   // Objects sit on the floor most of the cells beside them have (so a lantern in
   // Chinatown gets sidewalk under it, and the last chair in a row stays on the
   // grass). Ties go to left, right, up, down in that order, and corners only
-  // count when nothing beside it is floor.
+  // count when nothing beside it is floor. A rug only counts from two sides,
+  // so furniture that just touches a rug's edge (the bed's corner) doesn't
+  // drag a sliver of rug out under it.
   const floorAt = (r, c) => {
     for (const around of [[[0, -1], [0, 1], [-1, 0], [1, 0]], [[-1, -1], [1, 1], [-1, 1], [1, -1]]]) {
       const counts = new Map();
@@ -142,6 +182,7 @@ function layout(area) {
         const floor = area.floors[rows[r + dr]?.[c + dc]];
         if (floor) counts.set(floor, (counts.get(floor) ?? 0) + 1);
       }
+      for (const [floor, n] of counts) if (floor.startsWith("rug") && n < 2) counts.delete(floor);
       let best = null;
       for (const [floor, n] of counts) if (!best || n > counts.get(best)) best = floor;
       if (best) return best;
@@ -166,7 +207,8 @@ function layout(area) {
         let left = c;
         while (rows[top - 1]?.[c] === ch) top--;
         while (row[left - 1] === ch) left--;
-        cells.push((grid[r][c] = { r, c, ch, floor: null, object: `${object}_${r - top}_${c - left}` }));
+        const piece = `${object}_${r - top}_${c - left}`;
+        cells.push((grid[r][c] = { r, c, ch, floor: FULL.has(piece) ? null : floorAt(r, c), object: piece }));
         return;
       }
       // A row of the same piece joins up: beds, the taxi, the restaurant front
@@ -253,7 +295,7 @@ function bake(img, area, name) {
     const trimFloor = !cell.object || !FULL.has(cell.object);
     if (cell.floor) draw(ground, cell.floorLook, r, c);
     if (trimFloor) cell.edges.forEach((edge) => draw(ground, edge, r, c));
-    if (cell.object) draw(OVERHEAD.has(cell.object) ? above : ground, cell.objectLook, r, c);
+    if (cell.object && !LIVE.has(cell.object)) draw(OVERHEAD.has(cell.object) ? above : ground, cell.objectLook, r, c);
     if (!trimFloor) cell.edges.forEach((edge) => draw(ground, edge, r, c));
     if (cell.top) draw(above, cell.top, r - 1, c);
   }
@@ -278,6 +320,7 @@ const ROOFTOP = {
   ],
 };
 
+k.load(crowdLoaded);
 k.load(
   tilesImage.then((img) => {
     AREAS.forEach((area, i) => bake(img, area, `map-${i}`));
@@ -285,11 +328,13 @@ k.load(
   }),
 );
 
-// Photos are loaded up front (keyed by path) so cards open instantly.
-const photoKey = (item) => (item?.photo ? item.photo : null);
+// Photos are loaded up front (keyed by path) so cards open instantly. Files in
+// public/ are served from the top of the site, so "public/photos/a.jpg",
+// "photos/a.jpg" and "/photos/a.jpg" all mean /photos/a.jpg.
+const photoKey = (item) => (item?.photo ? `/${item.photo.replace(/^\/?(public\/)?/, "")}` : null);
 AREAS.forEach((area) => {
   [...area.notes, ...(area.goal?.cards ?? [])].forEach((item) => {
-    if (item.photo) k.loadSprite(item.photo, item.photo);
+    if (item.photo) k.loadSprite(photoKey(item), photoKey(item));
   });
 });
 
@@ -330,11 +375,17 @@ function button(label, pos, onPick, { primary = false, width = 180 } = {}) {
     k.z(100),
   ]);
   b.add([k.text(label, { size: 20 }), k.pos(0, 1), k.anchor("center"), k.color(primary ? COLORS.ink : COLORS.paper)]);
-  b.onClick(onPick);
+  b.onClick(() => {
+    unlockAudio();
+    sfx("click");
+    onPick();
+  });
   return b;
 }
 
 k.scene("title", () => {
+  playMusic(CONFIG.music);
+  muteButton();
   const sky = k.Color.fromHex("#1b2340");
   k.setBackground(sky);
   k.setCamScale(ZOOM);
@@ -378,17 +429,21 @@ k.scene("title", () => {
   const progress = loadProgress();
   const saved = AREAS[progress.chapter] ? progress.chapter : null;
   let primary = null;
+  const start = (then) => () => {
+    unlockAudio();
+    then();
+  };
   if (progress.done) {
-    primary = () => k.go("prologue");
+    primary = start(() => k.go("prologue"));
     button("Play again", k.vec2(k.width() / 2, 148), primary, { primary: true });
     button("Chapters", k.vec2(k.width() / 2, 186), () => k.go("chapters"));
   } else if (saved !== null) {
-    primary = () => k.go("area", saved);
+    primary = start(() => k.go("area", saved));
     button("Continue", k.vec2(k.width() / 2, 136), primary, { primary: true });
     k.add([k.text(AREAS[saved].chapter, { size: 20 }), k.pos(k.width() / 2, 164), k.anchor("center"), k.color(COLORS.muted), k.fixed(), k.z(100)]);
     button("Start over", k.vec2(k.width() / 2, 196), () => k.go("prologue"));
   } else {
-    primary = () => k.go("prologue");
+    primary = start(() => k.go("prologue"));
     const prompt = k.add([
       k.text("tap to start", { size: 20 }),
       k.pos(k.width() / 2, 160),
@@ -399,7 +454,7 @@ k.scene("title", () => {
       k.z(100),
     ]);
     prompt.onUpdate(() => { prompt.opacity = 0.7 + 0.3 * Math.sin(k.time() * 3); });
-    k.onMousePress(primary);
+    k.onMousePress(() => { if (!overMute()) primary(); });
   }
   k.onKeyPress(["space", "enter"], primary);
 });
@@ -427,6 +482,7 @@ k.scene("chapters", () => {
 
 // A handwritten-style letter that fills in one line per tap.
 k.scene("prologue", () => {
+  playMusic(CONFIG.music);
   k.setBackground(COLORS.ink);
   const W = k.width() - 40;
   const card = k.add([
@@ -467,6 +523,9 @@ k.scene("prologue", () => {
 k.scene("area", (index) => {
   const area = AREAS[index];
   saveProgress({ chapter: index });
+  if (area.music !== undefined) playMusic(area.music);
+  // Get the next chapter's song ready while she plays this one.
+  preloadMusic(AREAS[index + 1] ? AREAS[index + 1].music : ENDING.music);
   k.setBackground(k.Color.fromHex(area.background ?? "#1a1420"));
   k.setCamScale(ZOOM);
 
@@ -500,6 +559,47 @@ k.scene("area", (index) => {
   });
 
   let spawn = k.vec2(mapW / 2, mapH / 2);
+  const tileCenter = ([c, r]) => k.vec2(c * TILE + TILE / 2, r * TILE + TILE / 2);
+  const water = [];
+
+  // The stray cat (the `cat` tile): sits and flicks its tail, wanders a couple
+  // of tiles either way now and then, and trails after her a little while
+  // she's carrying a box. Its frames are in tools/critter_sprite.py.
+  const addCat = (home) => {
+    const cat = k.add([k.sprite("critters", { frame: 4 }), k.pos(home), k.anchor("center"), k.z(8), { state: "sit", t: k.rand(2, 4), to: home.x }]);
+    const [min, max] = [home.x - 2 * TILE, home.x + 2 * TILE];
+    cat.onUpdate(() => {
+      cat.t -= k.dt();
+      // Keep an eye on her boxes.
+      if (carried && cat.state !== "walk" && player.pos.dist(cat.pos) < 90) {
+        const want = k.clamp(player.pos.x + (cat.pos.x < player.pos.x ? -22 : 22), min, max);
+        if (Math.abs(want - cat.pos.x) > 8) Object.assign(cat, { state: "walk", to: want });
+      }
+      if (cat.state === "walk") {
+        const d = cat.to - cat.pos.x;
+        cat.pos.x += Math.sign(d) * Math.min(Math.abs(d), 22 * k.dt());
+        // The walk frames face left.
+        cat.flipX = d > 0;
+        cat.frame = Math.floor(k.time() * 6) % 2 ? 7 : 8;
+        if (Math.abs(d) < 0.5) Object.assign(cat, { state: "sit", t: k.rand(3, 7), flipX: false });
+      } else if (cat.state === "loaf") {
+        cat.frame = 9;
+        if (cat.t < 0) Object.assign(cat, { state: "sit", t: k.rand(2, 5) });
+      } else {
+        // Sitting: flick the tail and blink now and then.
+        const tick = (k.time() + home.x) % 4;
+        cat.frame = tick < 0.5 ? 5 : tick > 3.85 ? 6 : 4;
+        if (cat.t < 0) {
+          const roll = k.rand();
+          if (roll < 0.6) Object.assign(cat, { state: "walk", to: k.rand(min, max) });
+          else if (roll < 0.85) Object.assign(cat, { state: "loaf", t: k.rand(4, 8) });
+          else cat.t = k.rand(2, 4);
+        }
+      }
+    });
+    return cat;
+  };
+
   const npcs = [];
   const addNpc = (data, center, isGoal) => {
     const npc = k.add([
@@ -540,7 +640,10 @@ k.scene("area", (index) => {
     const center = cellCenter(cell);
     if (ch === area.goal?.tile) goalSpots.push(center);
     if (cell.object?.startsWith("uhaulBack")) truckBack.push(cell);
-    if (area.details?.[ch]) details.push({ pos: center, lines: area.details[ch], seen: false });
+    // The cat walks around, so its line goes wherever it is.
+    const live = cell.object === "cat" ? addCat(center) : null;
+    if (area.details?.[ch]) details.push({ at: live ?? { pos: center }, lines: area.details[ch], seen: false });
+    if (cell.object?.startsWith("water")) water.push(center);
     if (tint) addGlows(cell.object, center);
     if (MUSIC.has(cell.object)) {
       // Music notes drifting up from the decks (or the band).
@@ -556,12 +659,14 @@ k.scene("area", (index) => {
         ]);
       });
     }
-    if (cell.object === "stovePot") {
+    const steam = STEAM[cell.object];
+    if (steam) {
       // A little steam so it looks like someone was just cooking.
-      k.loop(0.3, () => {
+      const from = center.add(...steam.at);
+      k.loop(steam.every, () => {
         k.add([
           k.rect(2, 2),
-          k.pos(center.add(k.rand(-6, 6), k.rand(-6, 0))),
+          k.pos(from.add(k.rand(-steam.spread, steam.spread), k.rand(-3, 3))),
           k.color(255, 255, 255),
           k.opacity(0.7),
           k.move(k.vec2(k.rand(-0.2, 0.2), -1), k.rand(8, 14)),
@@ -593,8 +698,12 @@ k.scene("area", (index) => {
       const data = onN[npcIdx++];
       if (data) addNpc(data, center, ch === area.goal?.tile);
     } else if (ch === "D") {
+      // Two exit doors side by side make one wide door, if the tile has halves.
+      const row = area.map[cell.r];
+      const half = row[c + 1] === "D" ? "L" : row[c - 1] === "D" ? "R" : "";
+      const look = hasTile(area.door + half) ? area.door + half : area.door;
       doors.push(k.add([
-        k.sprite("tiles", { frame: tileFrame(area.door) }),
+        k.sprite("tiles", { frame: tileFrame(look) }),
         k.pos(center),
         k.anchor("center"),
         k.area(),
@@ -624,6 +733,191 @@ k.scene("area", (index) => {
     k.z(10),
     "player",
   ]);
+  // The crowd (`people`): someone walking a `path` of [column, row] tiles back
+  // and forth (or round and round, with `loop`), or standing `at` a tile facing
+  // `face`. Anyone with `lines` stops, turns to her and says them when she
+  // walks up. `look` picks who they are (a row in tools/crowd_sprite.py).
+  const toward = (d) => (Math.abs(d.x) > Math.abs(d.y) ? (d.x > 0 ? "right" : "left") : d.y > 0 ? "down" : "up");
+  const people = (area.people ?? []).map((data) => {
+    const points = (data.path ?? [data.at]).map(tileCenter);
+    const facing = data.face ?? "down";
+    return k.add([
+      k.sprite("crowd", { anim: `${data.look}-${facing}-idle` }),
+      k.pos(points[0]),
+      k.anchor("center"),
+      k.z(9),
+      { data, facing, points, next: 1, dir: 1, rest: k.rand(0, 2), near: false, talking: false },
+    ]);
+  });
+  const pose = (person, walking) => {
+    const name = `${person.data.look}-${person.facing}-${walking ? "walk" : "idle"}`;
+    if (person.getCurAnim()?.name !== name) person.play(name);
+  };
+  const walkPeople = () => {
+    for (const person of people) {
+      const { points, data } = person;
+      if (person.talking || points.length < 2 || (person.rest -= k.dt()) > 0) {
+        if (!person.talking && points.length < 2) person.facing = data.face ?? "down";
+        pose(person, false);
+        continue;
+      }
+      const to = points[person.next];
+      const d = to.sub(person.pos);
+      // Wait for her if she's right in the way.
+      const ahead = player.pos.sub(person.pos);
+      if (ahead.len() < 18 && d.len() > 0 && ahead.dot(d.unit()) > 4) {
+        pose(person, false);
+        continue;
+      }
+      const step = (data.speed ?? 32) * k.dt();
+      if (d.len() <= step) {
+        person.pos = to.clone();
+        if (data.loop) {
+          person.next = (person.next + 1) % points.length;
+        } else {
+          // The end of the path: stop for a moment, then head back.
+          if (!points[person.next + person.dir]) {
+            person.dir *= -1;
+            person.rest = data.pause ?? k.rand(1, 3);
+          }
+          person.next += person.dir;
+        }
+      } else {
+        person.pos = person.pos.add(d.unit().scale(step));
+        person.facing = toward(d);
+      }
+      pose(person, true);
+    }
+  };
+
+  // Traffic (`traffic`): cars along a map row, driving off one side and on
+  // from the other. `car` is a two-tile vehicle facing the way it drives
+  // ("taxi" goes west, "taxiEast" east). They stop for her, and for each other.
+  const cars = [];
+  for (const lane of area.traffic ?? []) {
+    const dir = lane.car.endsWith("East") ? 1 : -1;
+    const y = lane.row * TILE;
+    const speed = lane.speed ?? 45;
+    const spawnCar = (x) => {
+      if (cars.some((car) => car.lane === lane && Math.abs(car.pos.x - x) < 3 * TILE)) return;
+      const car = k.add([k.pos(x, y), k.z(4), { lane, dir, v: speed, speed }]);
+      car.add([k.sprite("tiles", { frame: tileFrame(`${lane.car}L`) })]);
+      car.add([k.sprite("tiles", { frame: tileFrame(`${lane.car}R`) }), k.pos(TILE, 0)]);
+      cars.push(car);
+    };
+    // One already on the road, then another every few seconds.
+    spawnCar(k.rand(0, mapW - 2 * TILE));
+    const next = () => k.wait(k.rand(...(lane.every ?? [4, 9])), () => {
+      spawnCar(dir > 0 ? -2 * TILE : mapW);
+      next();
+    });
+    next();
+  }
+  const driveCars = () => {
+    for (const car of [...cars]) {
+      let want = car.speed;
+      // Her feet in this lane, anywhere from beside the car to just ahead of it.
+      const front = car.pos.x + (car.dir > 0 ? 2 * TILE : 0);
+      const gap = (player.pos.x - front) * car.dir;
+      if (Math.abs(player.pos.y + 7 - (car.pos.y + TILE / 2)) < 11 && gap > -2 * TILE - 6 && gap < 42) want = 0;
+      for (const other of cars) {
+        const ahead = (other.pos.x - car.pos.x) * car.dir;
+        if (other !== car && other.lane === car.lane && ahead > 0 && ahead < 2 * TILE + 12) want = 0;
+      }
+      car.v += (want - car.v) * Math.min(1, k.dt() * 4);
+      car.pos.x += car.v * car.dir * k.dt();
+      if (car.pos.x < -3 * TILE || car.pos.x > mapW + TILE) {
+        k.destroy(car);
+        cars.splice(cars.indexOf(car), 1);
+      }
+    }
+  };
+
+  // Pigeons (`pigeons`: [column, row] tiles where a few of them peck around).
+  // They scatter when she gets close, and come back once she's moved on.
+  for (const home of (area.pigeons ?? []).map(tileCenter)) {
+    for (let i = 0; i < 3; i++) {
+      const spot = home.add(Math.round(k.rand(-10, 10)), Math.round(k.rand(-5, 5)));
+      const bird = k.add([
+        k.sprite("critters", { frame: 0, flipX: k.rand() < 0.5 }),
+        k.pos(spot),
+        k.anchor("center"),
+        k.opacity(1),
+        k.z(8),
+        { state: "ground", t: k.rand(0, 1.5), vel: k.vec2(0, 0) },
+      ]);
+      const flap = () => { bird.frame = Math.floor(k.time() * 12 + i) % 2 ? 2 : 3; };
+      bird.onUpdate(() => {
+        bird.t -= k.dt();
+        if (bird.state === "ground") {
+          if (player.pos.dist(bird.pos) < 30) {
+            // Off they go, away from her and up.
+            const away = bird.pos.x >= player.pos.x ? 1 : -1;
+            Object.assign(bird, { state: "fly", t: 1.4, vel: k.vec2(away * k.rand(45, 65), -k.rand(30, 45)), z: 20 });
+            bird.flipX = away < 0;
+          } else if (bird.t < 0) {
+            // Peck, look around, or hop a step.
+            const roll = k.rand();
+            bird.frame = roll < 0.45 ? 1 : 0;
+            if (roll > 0.8) {
+              const hop = k.rand(-3, 3);
+              bird.flipX = hop < 0;
+              bird.pos.x = k.clamp(bird.pos.x + hop, spot.x - 8, spot.x + 8);
+            }
+            bird.t = k.rand(0.3, 1.2);
+          }
+        } else if (bird.state === "fly") {
+          flap();
+          bird.pos = bird.pos.add(bird.vel.scale(k.dt()));
+          bird.opacity = Math.min(1, bird.t / 0.4);
+          if (bird.t < 0) Object.assign(bird, { state: "gone", t: k.rand(5, 9), opacity: 0 });
+        } else if (bird.state === "gone") {
+          if (bird.t < 0 && player.pos.dist(spot) > 80) {
+            const side = k.choose([-1, 1]);
+            Object.assign(bird, { state: "back", pos: spot.add(side * 70, -50), opacity: 1 });
+            bird.flipX = side > 0;
+          }
+        } else {
+          // Gliding back down to where they were.
+          flap();
+          const d = spot.sub(bird.pos);
+          if (d.len() < 2) Object.assign(bird, { state: "ground", pos: spot.clone(), frame: 0, z: 8, t: k.rand(0.5, 1.5) });
+          else bird.pos = bird.pos.add(d.unit().scale(Math.min(d.len(), 60 * k.dt())));
+        }
+      });
+    }
+  }
+
+  // Light glinting off the water.
+  if (water.length) {
+    k.loop(0.12, () => {
+      const at = k.choose(water);
+      k.add([
+        k.rect(k.choose([2, 3, 4]), 1),
+        k.pos(at.add(Math.round(k.rand(-7, 5)), Math.round(k.rand(-7, 7)))),
+        k.color(255, 255, 255),
+        k.opacity(0.8),
+        k.lifespan(0.8, { fade: 0.6 }),
+        k.z(1),
+      ]);
+    });
+  }
+
+  // Spotlights (`spotlights`: [column, row] of whoever's in them): a beam from
+  // the top of the map down to them and a pool of light at their feet, bright
+  // through the dim.
+  for (const [c, r] of area.spotlights ?? []) {
+    const at = tileCenter([c, r]);
+    const light = [k.color(255, 236, 190), k.z(51)];
+    const beam = k.add([k.polygon([k.vec2(at.x - 4, 0), k.vec2(at.x + 4, 0), k.vec2(at.x + 12, at.y + 9), k.vec2(at.x - 12, at.y + 9)]), k.opacity(0.12), ...light]);
+    const pool = k.add([k.circle(12), k.pos(at.add(0, 9)), k.scale(1, 0.4), k.opacity(0.24), ...light]);
+    beam.onUpdate(() => {
+      const f = 1 + 0.08 * Math.sin(k.time() * 2.3 + c);
+      beam.opacity = 0.12 * f;
+      pool.opacity = 0.24 * f;
+    });
+  }
+
   // Someone who walks along with her (Nathan, at Andy's). He follows the path
   // she walked, a step behind.
   let companion = null;
@@ -686,6 +980,7 @@ k.scene("area", (index) => {
     hudX += 64;
     return text;
   };
+  const mute = muteButton();
   const noteCounter = total > 0 ? hudPill("note") : null;
   const boxCounter = boxTotal > 0 ? hudPill("box") : null;
   const updateCounter = () => {
@@ -695,6 +990,7 @@ k.scene("area", (index) => {
   updateCounter();
 
   const openDoors = () => {
+    if (doors.some((door) => !door.open)) sfx("open");
     for (const door of doors) {
       if (door.open) continue;
       door.open = true;
@@ -717,9 +1013,12 @@ k.scene("area", (index) => {
     cutscene = true;
     const goal = area.goal;
     if (goal.meet && companion) await meet(goalSpots[0]);
+    const him = goal.view && npcs.find((npc) => npc.isGoal);
+    if (him) await beside(him);
     if (goal.lines?.length) await say(goal.lines, goal.speaker);
     for (const card of goal.cards ?? []) await showMemory(card, photoKey(card), card.label);
     if (goal.ticket) await showTicket(goal.ticket);
+    if (him) await lookOut(him);
     if (goal.end?.length) await say(goal.end, goal.endSpeaker);
     if (goal.advance) {
       if (goal.fade) await fadeOut();
@@ -759,14 +1058,15 @@ k.scene("area", (index) => {
   let camAt = null;
   let camLag = 0;
   const wait = (t) => new Promise((res) => k.wait(t, res));
-  const glimpse = async ({ path, carry, lines }) => {
+  const glimpse = async ({ path, carry, sprite, lines }) => {
     cutscene = true;
-    const points = path.map(([c, r]) => k.vec2(c * TILE + TILE / 2, r * TILE + TILE / 2));
+    const points = path.map(tileCenter);
     const him = k.add([k.pos(points[0]), k.z(9), { facing: "down" }]);
-    const parts = [him.add([k.sprite("nathan", { anim: "down-idle" }), k.pos(0, -1), k.anchor("center"), k.opacity(1)])];
+    const parts = [him.add([k.sprite(sprite ?? "nathan", { anim: "down-idle" }), k.pos(0, -1), k.anchor("center"), k.opacity(1)])];
     if (carry) parts.push(him.add([k.sprite("tiles", { frame: tileFrame(carry) }), k.pos(0, -19), k.anchor("center"), k.opacity(1)]));
     // She turns toward him.
     face(points[0].sub(player.pos));
+    sfx("alert");
     const alert = player.add([k.text("!", { size: 10 }), k.pos(0, -20), k.anchor("center"), k.color(COLORS.accent)]);
     camFocus = him;
     await wait(1.1);
@@ -789,6 +1089,49 @@ k.scene("area", (index) => {
     if (lines?.length) await say(lines);
   };
 
+  // `reveal`: the camera finds him before she does. He's looking out at the
+  // view, turns around when he feels someone watching, and she says `lines`.
+  const NATHAN = { down: 0, up: 3, right: 6, left: 9 };
+  const reveal = async ({ lines }) => {
+    const him = npcs.find((npc) => npc.isGoal);
+    if (!him) return;
+    cutscene = true;
+    camFocus = him;
+    await wait(1.8);
+    him.frame = NATHAN.down;
+    hearts(him.pos.add(0, -14), 4);
+    await wait(0.8);
+    if (lines?.length) await say(lines);
+    camFocus = null;
+    await new Promise((res) => {
+      const check = k.onUpdate(() => { if (camLag < 1) { check.cancel(); res(); } });
+    });
+    cutscene = false;
+  };
+
+  // A goal with `view`: she walks up beside him (whichever side she's nearer,
+  // if there's room), they face each other for the `lines`, then both turn to
+  // look out at the view before the `end`.
+  const free = (spot) => cells.some((cell) => cell.floor && !cell.object && cellCenter(cell).dist(spot) < 1) && !npcs.some((npc) => npc.pos.dist(spot) < 1);
+  const beside = async (him) => {
+    const sides = [him.pos.add(TILE, 0), him.pos.add(-TILE, 0)].sort((a, b) => a.dist(player.pos) - b.dist(player.pos));
+    const spot = sides.find(free) ?? sides[0];
+    facing = toward(spot.sub(player.pos));
+    scripted = true;
+    await walkTo(player, spot, Math.max(0.3, player.pos.dist(spot) / SPEED));
+    scripted = false;
+    const herLeft = spot.x < him.pos.x;
+    facing = herLeft ? "right" : "left";
+    him.frame = herLeft ? NATHAN.left : NATHAN.right;
+  };
+  const lookOut = async (him) => {
+    facing = "up";
+    him.frame = NATHAN.up;
+    await wait(0.6);
+    hearts(player.pos.lerp(him.pos, 0.5).add(0, -16), 10);
+    await wait(1.6);
+  };
+
   let goalNear = false;
 
   // Boxes: walk into one to pick it up, walk it to the back of the U-Haul.
@@ -796,23 +1139,36 @@ k.scene("area", (index) => {
   player.onCollide("box", (b) => {
     if (carried) return;
     k.destroy(b);
+    sfx("box");
     carried = k.add([k.sprite("tiles", { frame: tileFrame("box") }), k.pos(player.pos), k.anchor("center"), k.z(12)]);
   });
+  // Where loaded boxes land in the back of the truck, from its top left corner:
+  // three along the floor, then two stacked on top of them.
+  const BOX_SLOTS = [[3, 3], [11, 3], [19, 3], [7, 0], [15, 0], [11, -3]];
   const loadBox = () => {
+    const from = carried.pos.sub(4, 3);
     k.destroy(carried);
     carried = null;
     loaded++;
     // Let the truck respond right away ("2 more boxes", or finishing the chapter).
     goalNear = false;
     updateCounter();
-    const back = cellCenter(truckBack[0]).add(TILE / 2, 0);
-    hearts(back, 6);
-    if (boxesLeft() === 0) {
-      // Pull the doors shut.
-      for (const cell of truckBack) {
-        k.add([k.sprite("tiles", { frame: tileFrame(cell.object.replace("Back", "Closed")) }), k.pos(cell.c * TILE, cell.r * TILE), k.z(1)]);
+    const last = boxesLeft() === 0;
+    const to = k.vec2(truckBack[0].c * TILE, truckBack[0].r * TILE).add(...BOX_SLOTS[Math.min(loaded, BOX_SLOTS.length) - 1]);
+    // It goes up and over into the truck, and onto the stack.
+    const box = k.add([k.sprite("tiles", { frame: tileFrame("miniBox") }), k.pos(from), k.z(12)]);
+    k.tween(0, 1, 0.35, (t) => { box.pos = from.lerp(to, t).sub(0, Math.round(Math.sin(t * Math.PI) * 12)); }, k.easings.linear).onEnd(() => {
+      box.pos = to;
+      box.z = 0.5;
+      sfx("load");
+      hearts(to.add(4, 0), 6);
+      if (last) {
+        // Pull the doors shut.
+        for (const cell of truckBack) {
+          k.add([k.sprite("tiles", { frame: tileFrame(cell.object.replace("Back", "Closed")) }), k.pos(cell.c * TILE, cell.r * TILE), k.z(1)]);
+        }
       }
-    }
+    });
   };
 
   // Movement: arrows/WASD, or tap/hold anywhere to walk toward that spot.
@@ -821,7 +1177,8 @@ k.scene("area", (index) => {
   let stuck = 0;
   const busy = () => ui.busy || cutscene;
   k.onMousePress(() => {
-    if (busy()) return;
+    unlockAudio();
+    if (busy() || mute.isHovering()) return;
     holding = true;
     // Set the target right away: a quick tap can press and release within one frame.
     target = k.toWorld(k.mousePos());
@@ -868,6 +1225,10 @@ k.scene("area", (index) => {
 
     if (carried) carried.pos = player.pos.add(0, -16);
     if (companion && !cutscene) follow();
+    walkPeople();
+    driveCars();
+    // Whoever is lower on screen is in front of her.
+    for (const other of [...npcs, ...people]) other.z = other.pos.y > player.pos.y ? 11 : 9;
 
     // Keep the camera on the player (or whatever it's following for a moment)
     // without showing space outside the map.
@@ -895,8 +1256,23 @@ k.scene("area", (index) => {
       if (busy()) return;
     }
 
+    for (const person of people) {
+      const close = player.pos.dist(person.pos) < 22;
+      if (close && !person.near && person.data.lines?.length) {
+        person.talking = true;
+        person.facing = toward(player.pos.sub(person.pos));
+        pose(person, false);
+        say(person.data.lines, person.data.name).then(() => {
+          person.talking = false;
+          if (person.points.length < 2) person.facing = person.data.face ?? "down";
+        });
+      }
+      person.near = close;
+      if (busy()) return;
+    }
+
     for (const detail of details) {
-      if (!detail.seen && player.pos.dist(detail.pos) < 24) {
+      if (!detail.seen && player.pos.dist(detail.at.pos) < 24) {
         detail.seen = true;
         say(detail.lines);
         return;
@@ -940,6 +1316,7 @@ k.scene("area", (index) => {
 
   player.onCollide("note", async (n) => {
     k.destroy(n);
+    sfx("note");
     hearts(n.pos, 8);
     found++;
     updateCounter();
@@ -954,6 +1331,7 @@ k.scene("area", (index) => {
   titleCard(area.chapter, area.name).then(async () => {
     if (area.intro?.length) await say(area.intro);
     if (area.glimpse) await glimpse(area.glimpse);
+    if (area.reveal) await reveal(area.reveal);
   });
 });
 
@@ -961,6 +1339,7 @@ k.scene("area", (index) => {
 // scrapbook, then the sign-off over it.
 k.scene("ending", () => {
   saveProgress({ done: true });
+  playMusic(ENDING.music);
   k.setBackground(COLORS.ink);
   const center = k.vec2(k.width() / 2, k.height() / 2);
   const wait = (t) => new Promise((res) => k.wait(t, res));
@@ -980,7 +1359,7 @@ k.scene("ending", () => {
   // A note's photo, or until there is one, the spot in the map where she found it.
   const SNAP = 64;
   const snapshot = (area, a, note, n) => {
-    if (note.photo) return [k.sprite(note.photo, { width: SNAP, height: SNAP })];
+    if (note.photo) return [k.sprite(photoKey(note), { width: SNAP, height: SNAP, quad: squareCrop(photoKey(note)) })];
     const mapW = area.map[0].length * TILE;
     const mapH = area.map.length * TILE;
     const r = area.map.findIndex((row) => row.includes(String(n + 1)));
@@ -994,6 +1373,8 @@ k.scene("ending", () => {
     return parts;
   };
   const memories = AREAS.flatMap((area, a) => area.notes.map((note, n) => ({ area, a, note, n })));
+  // How far the page has dimmed for the sign-off (0 to 0.9).
+  let dimmed = 0;
   const COLS = 3;
   const polaroid = ({ area, a, note, n }, i) => {
     const row = Math.floor(i / COLS);
@@ -1012,6 +1393,15 @@ k.scene("ending", () => {
       k.z(10 + i),
     ]);
     for (const part of snapshot(area, a, note, n)) card.add([...[part].flat(), k.pos(0, -8), k.anchor("center")]);
+    // A real photo goes on top, sharp (see photoOverlay in ui.js), turned and
+    // scaled with its polaroid, and fading with the page at the end.
+    if (note.photo) {
+      photoOverlay(card, photoKey(note), () => {
+        const t = k.deg2rad(card.angle);
+        const s = card.scale.x;
+        return { x: card.pos.x + 8 * s * Math.sin(t), y: card.pos.y - 8 * s * Math.cos(t), w: SNAP * s, h: SNAP * s, angle: card.angle, opacity: 1 - dimmed / 0.9 };
+      });
+    }
     card.add([k.text(note.title, { size: 10, width: SNAP + 8, align: "center" }), k.pos(0, SNAP / 2 + 5), k.anchor("center"), k.color(COLORS.ink)]);
     // Dropped onto the page.
     k.tween(1.5, 1, 0.25, (v) => { card.scale = k.vec2(v); }, k.easings.easeOutQuad);
@@ -1031,7 +1421,7 @@ k.scene("ending", () => {
 
     // Dim the scrapbook and sign off over it.
     const dim = k.add([k.rect(k.width(), k.height()), k.color(COLORS.ink), k.opacity(0), k.fixed(), k.z(90)]);
-    k.tween(0, 0.9, 1.2, (v) => { dim.opacity = v; });
+    k.tween(0, 0.9, 1.2, (v) => { dim.opacity = v; dimmed = v; });
     k.loop(0.4, () => hearts(k.vec2(k.rand(20, k.width() - 20), k.height() - 10), 1, true, 95));
     await fadeIn(show(ENDING.signoff, 30, COLORS.paper, center.add(0, -20)), 1.2);
     hearts(center.add(0, -20), 20, true, 101);

@@ -1,4 +1,5 @@
 import { k } from "./kaplay.js";
+import { isMuted, sfx, toggleMute, unlockAudio } from "./audio.js";
 
 export const COLORS = {
   ink: k.Color.fromHex("#3a2e39"),
@@ -12,7 +13,7 @@ export const ui = { busy: false };
 
 // Wait for a tap/click or space/enter, then resolve.
 function onAdvance(fn) {
-  const a = k.onMousePress(fn);
+  const a = k.onMousePress(() => { if (!overMute()) fn(); });
   const b = k.onKeyPress(["space", "enter"], fn);
   return () => { a.cancel(); b.cancel(); };
 }
@@ -54,11 +55,16 @@ export function say(lines, speaker = null) {
 
     let line = 0;
     let shown = 0;
+    // A blip for every other letter as it types out: lower for Nathan, higher
+    // for everyone else, in between for Hannah's own thoughts.
+    const pitch = speaker === "Nathan" ? 0.8 : speaker ? 1.2 : 1;
     body.onUpdate(() => {
       const full = lines[line];
       if (shown < full.length) {
+        const before = Math.floor(shown);
         shown = Math.min(full.length, shown + k.dt() * 45);
         body.text = full.slice(0, Math.floor(shown));
+        for (let i = before; i < Math.floor(shown); i++) if (i % 2 === 0 && full[i] !== " ") { sfx("blip", pitch * k.rand(0.97, 1.03), 0.25); break; }
       }
       hint.opacity = shown >= full.length ? 0.6 + 0.4 * Math.sin(k.time() * 5) : 0;
     });
@@ -81,12 +87,58 @@ export function say(lines, speaker = null) {
   });
 }
 
+// Photos are shown as ordinary web images laid over the game, so they stay
+// sharp at the phone's full resolution. (The game itself is drawn at 320x480
+// and scaled up without smoothing, which keeps the pixel art crisp but turns
+// photos blocky.) The game still draws its own copy underneath, which shows
+// while the image loads. `place` returns where it goes each frame, in game
+// pixels: its center, size, rotation and opacity. It goes away with `obj`.
+const overlays = new Set();
+export function photoOverlay(obj, src, place) {
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = "";
+  Object.assign(img.style, { position: "fixed", left: "0", top: "0", objectFit: "cover", pointerEvents: "none", zIndex: "1" });
+  document.body.appendChild(img);
+  overlays.add(img);
+  const update = () => {
+    // Where the 320x480 game sits on the page (it's letterboxed to fit).
+    const r = k.canvas.getBoundingClientRect();
+    const s = Math.min(r.width / k.width(), r.height / k.height());
+    const ox = r.left + (r.width - k.width() * s) / 2;
+    const oy = r.top + (r.height - k.height() * s) / 2;
+    const { x, y, w, h, angle = 0, opacity = 1 } = place();
+    img.style.width = `${w * s}px`;
+    img.style.height = `${h * s}px`;
+    img.style.transform = `translate(${ox + x * s}px, ${oy + y * s}px) translate(-50%, -50%) rotate(${angle}deg)`;
+    img.style.opacity = String(opacity);
+  };
+  update();
+  obj.onUpdate(update);
+  obj.onDestroy(() => {
+    img.remove();
+    overlays.delete(img);
+  });
+}
+k.onSceneLeave(() => {
+  overlays.forEach((img) => img.remove());
+  overlays.clear();
+});
+
+// Show the middle of a photo, cropped to a square, instead of squashing it.
+export function squareCrop(spriteName) {
+  const data = k.getSprite(spriteName)?.data;
+  if (!data) return undefined;
+  const { width: w, height: h } = data;
+  return w > h ? k.quad((1 - h / w) / 2, 0, h / w, 1) : k.quad(0, (1 - w / h) / 2, 1, w / h);
+}
+
 // Full-screen card showing a photo and caption (notes, dinner courses...).
 export function showMemory(memory, spriteName, label = "MEMORY FOUND") {
   return new Promise((resolve) => {
     ui.busy = true;
     const W = k.width() - 32;
-    const H = k.height() - 96;
+    const H = k.height() - 64;
     const card = k.add([
       k.rect(W, H, { radius: 8 }),
       k.pos(k.width() / 2, k.height() / 2),
@@ -109,11 +161,26 @@ export function showMemory(memory, spriteName, label = "MEMORY FOUND") {
       k.color(COLORS.accent),
     ]);
 
-    const photoW = W - 64;
-    const photoH = photoW;
+    // The photo gets whatever room the words leave (up to W - 64 square), so
+    // a long caption shrinks the photo instead of running off the card. If
+    // it's still too long with a small photo, the caption drops a size.
+    const textW = W - 24;
+    const measure = (str, size) => k.make([k.text(str, { size, width: textW, align: "center", lineSpacing: 2 })]).height;
+    const titleH = measure(memory.title, 30);
     const photoY = top + 18;
+    const room = (size) => H / 2 - 14 - (photoY + 8 + titleH + 4 + measure(memory.caption, size));
+    const captionSize = room(20) >= 120 ? 20 : 10;
+    const photoW = Math.floor(Math.min(W - 64, room(captionSize)));
+    const photoH = photoW;
     if (spriteName) {
-      card.add([k.sprite(spriteName, { width: photoW, height: photoH }), k.pos(0, photoY), k.anchor("top")]);
+      card.add([k.rect(photoW, photoH), k.pos(0, photoY), k.anchor("top"), k.color(COLORS.muted)]);
+      const photo = card.add([k.sprite(spriteName, { width: photoW, height: photoH, quad: squareCrop(spriteName) }), k.pos(0, photoY), k.anchor("top")]);
+      photoOverlay(photo, spriteName, () => ({
+        x: card.pos.x,
+        y: card.pos.y + (photoY + photoH / 2) * card.scale.y,
+        w: photoW * card.scale.x,
+        h: photoH * card.scale.y,
+      }));
     } else {
       card.add([k.rect(photoW, photoH), k.pos(0, photoY), k.anchor("top"), k.color(COLORS.muted)]);
       card.add([
@@ -125,13 +192,13 @@ export function showMemory(memory, spriteName, label = "MEMORY FOUND") {
     }
 
     const title = card.add([
-      k.text(memory.title, { size: 30, width: W - 24, align: "center" }),
+      k.text(memory.title, { size: 30, width: textW, align: "center", lineSpacing: 2 }),
       k.pos(0, photoY + photoH + 8),
       k.anchor("top"),
       k.color(COLORS.ink),
     ]);
     card.add([
-      k.text(memory.caption, { size: 20, width: W - 24, align: "center", lineSpacing: 2 }),
+      k.text(memory.caption, { size: captionSize, width: textW, align: "center", lineSpacing: 2 }),
       k.pos(0, title.pos.y + title.height + 4),
       k.anchor("top"),
       k.color(COLORS.ink),
@@ -261,6 +328,7 @@ export function showTicket(ticket) {
     ]);
     k.tween(0, 1, 1, (v) => { caption.opacity = v; });
     hearts(mid.add(0, -10), 30, true, 120);
+    sfx("ticket");
     const burst = k.loop(0.5, () => hearts(mid.add(k.rand(-120, 120), k.rand(-70, 50)), 2, true, 106));
 
     // Ignore taps for a moment so she gets to take it in.
@@ -273,4 +341,72 @@ export function showTicket(ticket) {
       });
     });
   });
+}
+
+// Speaker icons for the mute button, one character per pixel.
+const SPEAKER = {
+  on: [
+    ".....#......",
+    "....##..#...",
+    "...###...#..",
+    "######.#.#..",
+    "######.#.#..",
+    "######.#.#..",
+    "...###...#..",
+    "....##..#...",
+    ".....#......",
+  ],
+  off: [
+    ".....#......",
+    "....##......",
+    "...###.#...#",
+    "######..#.#.",
+    "######...#..",
+    "######..#.#.",
+    "...###.#...#",
+    "....##......",
+    ".....#......",
+  ],
+};
+for (const [name, rows] of Object.entries(SPEAKER)) {
+  const canvas = document.createElement("canvas");
+  canvas.width = rows[0].length;
+  canvas.height = rows.length;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = `rgb(${COLORS.ink.r}, ${COLORS.ink.g}, ${COLORS.ink.b})`;
+  rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === "#") ctx.fillRect(x, y, 1, 1); }));
+  k.loadSprite(`speaker-${name}`, canvas);
+}
+
+// The mute button in the top right corner. Returns it so a scene can ignore
+// taps on it (they shouldn't also walk her there).
+let mute = null;
+// Is this tap on the mute button (and so not meant for anything else)?
+export const overMute = () => Boolean(mute?.exists() && mute.isHovering());
+
+export function muteButton() {
+  const look = () => `speaker-${isMuted() ? "off" : "on"}`;
+  const button = k.add([
+    k.rect(32, 24, { radius: 4 }),
+    k.pos(k.width() - 36, 4),
+    k.color(COLORS.paper),
+    k.opacity(0.9),
+    k.area(),
+    k.fixed(),
+    k.z(95),
+  ]);
+  let icon = null;
+  const draw = () => {
+    if (icon) k.destroy(icon);
+    icon = button.add([k.sprite(look()), k.pos(4, 3), k.scale(2)]);
+  };
+  draw();
+  button.onClick(() => {
+    unlockAudio();
+    toggleMute();
+    draw();
+    sfx("click");
+  });
+  mute = button;
+  return button;
 }
