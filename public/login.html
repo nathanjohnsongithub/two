@@ -49,6 +49,7 @@
         line-height: 1;
         white-space: nowrap;
         font-weight: normal;
+        text-shadow: 0 calc(2 * var(--g)) 0 #0a0d22; /* stands out from the stars, like the game's title */
       }
       h1.at { top: calc(64 * var(--g)); font-size: calc(40 * var(--g)); }
       .subtitle { top: calc(100 * var(--g)); font-size: calc(20 * var(--g)); color: #e56b6f; }
@@ -96,8 +97,8 @@
         -webkit-appearance: none;
         appearance: none;
       }
-      input.box { top: calc(148 * var(--g)); background: #3a2e39; border-color: #9a8c98; color: #fffaf4; }
-      input.box::placeholder { color: #9a8c98; opacity: 1; }
+      input.box { top: calc(148 * var(--g)); background: #3a2e39; border-color: #fffaf4; color: #fffaf4; }
+      input.box::placeholder { color: #b9adb7; opacity: 1; }
       button.box { top: calc(186 * var(--g)); background: #fffaf4; border-color: #3a2e39; color: #3a2e39; cursor: pointer; }
       .box:focus-visible { outline: calc(2 * var(--g)) solid #e56b6f; outline-offset: calc(2 * var(--g)); }
       button.box:active { filter: brightness(0.9); }

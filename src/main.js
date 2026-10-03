@@ -362,6 +362,14 @@ AREAS.forEach((area, a) => {
   }
 });
 
+// Text over the night sky, with a dark drop shadow so it stands out from the stars.
+function skyText(label, size, pos, color) {
+  const shadow = k.add([k.text(label, { size }), k.pos(pos.add(0, 2)), k.anchor("center"), k.color(10, 13, 34), k.opacity(1), k.fixed(), k.z(99)]);
+  const text = k.add([k.text(label, { size }), k.pos(pos), k.anchor("center"), k.color(color), k.opacity(1), k.fixed(), k.z(100)]);
+  text.onUpdate(() => { shadow.opacity = text.opacity; });
+  return text;
+}
+
 // A button on a screen with no world behind it (the title, the chapter list).
 function button(label, pos, onPick, { primary = false, width = 180 } = {}) {
   const b = k.add([
@@ -369,7 +377,7 @@ function button(label, pos, onPick, { primary = false, width = 180 } = {}) {
     k.pos(pos),
     k.anchor("center"),
     k.color(primary ? COLORS.paper : COLORS.ink),
-    k.outline(2, primary ? COLORS.ink : COLORS.muted),
+    k.outline(2, primary ? COLORS.ink : COLORS.paper),
     k.area(),
     k.fixed(),
     k.z(100),
@@ -421,8 +429,8 @@ k.scene("title", () => {
   pan();
   k.onUpdate(pan);
 
-  k.add([k.text(CONFIG.title, { size: 40 }), k.pos(k.width() / 2, 64), k.anchor("center"), k.color(COLORS.paper), k.fixed(), k.z(100)]);
-  k.add([k.text(CONFIG.subtitle, { size: 20 }), k.pos(k.width() / 2, 100), k.anchor("center"), k.color(COLORS.accent), k.fixed(), k.z(100)]);
+  skyText(CONFIG.title, 40, k.vec2(k.width() / 2, 64), COLORS.paper);
+  skyText(CONFIG.subtitle, 20, k.vec2(k.width() / 2, 100), COLORS.accent);
 
   // First time: tap anywhere. After that, pick up where she left off, or
   // (once she's seen the ending) play again or jump to any chapter.
@@ -439,20 +447,13 @@ k.scene("title", () => {
     button("Chapters", k.vec2(k.width() / 2, 186), () => k.go("chapters"));
   } else if (saved !== null) {
     primary = start(() => k.go("area", saved));
-    button("Continue", k.vec2(k.width() / 2, 136), primary, { primary: true });
-    k.add([k.text(AREAS[saved].chapter, { size: 20 }), k.pos(k.width() / 2, 164), k.anchor("center"), k.color(COLORS.muted), k.fixed(), k.z(100)]);
-    button("Start over", k.vec2(k.width() / 2, 196), () => k.go("prologue"));
+    button("Continue", k.vec2(k.width() / 2, 134), primary, { primary: true });
+    // Which chapter she's on, by name ("Chapter 5 · Decker's Bagels").
+    skyText(`${AREAS[saved].chapter.split(" · ")[0]} · ${AREAS[saved].name}`, 20, k.vec2(k.width() / 2, 166), COLORS.paper);
+    button("Start over", k.vec2(k.width() / 2, 200), () => k.go("prologue"));
   } else {
     primary = start(() => k.go("prologue"));
-    const prompt = k.add([
-      k.text("tap to start", { size: 20 }),
-      k.pos(k.width() / 2, 160),
-      k.anchor("center"),
-      k.color(COLORS.paper),
-      k.opacity(1),
-      k.fixed(),
-      k.z(100),
-    ]);
+    const prompt = skyText("tap to start", 20, k.vec2(k.width() / 2, 160), COLORS.paper);
     prompt.onUpdate(() => { prompt.opacity = 0.7 + 0.3 * Math.sin(k.time() * 3); });
     k.onMousePress(() => { if (!overMute()) primary(); });
   }
